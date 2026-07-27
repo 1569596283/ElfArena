@@ -6,6 +6,7 @@
 #include "Player/ElfPlayerState.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "ElfGameplayTags.h"
 
 void UElfBattleController::Init(APlayerController* InOwner, EBattleType Type, AActor* Opponent)
 {
@@ -260,8 +261,78 @@ FName UElfBattleController::GetSelfCardID() const
 	return PS ? PS->CardID : FName("Default");
 }
 
+void UElfBattleController::SetInputMode(EBattleInputMode NewMode)
+{
+	if (CurrentInputMode == NewMode) return;
+	CurrentInputMode = NewMode;
+	OnInputModeChanged.Broadcast(NewMode);
+}
+
 void UElfBattleController::HandleInput(const FGameplayTag& InputTag)
 {
+	const FElfGameplayTags& Tags = FElfGameplayTags::Get();
+
+	// R=使用技能 / 返回
+	if (InputTag == Tags.Input_R)
+	{
+		if (CurrentInputMode == EBattleInputMode::Crafting)
+			SetInputMode(EBattleInputMode::Capture);
+		else
+			SetInputMode(EBattleInputMode::Command);
+		return;
+	}
+	// Q=道具, E=捕捉（仅 Command 模式下切换）
+	if (CurrentInputMode == EBattleInputMode::Command)
+	{
+		if (InputTag == Tags.Input_Q) { SetInputMode(EBattleInputMode::Item); return; }
+		if (InputTag == Tags.Input_E) { SetInputMode(EBattleInputMode::Capture); return; }
+	}
+
+	switch (CurrentInputMode)
+	{
+	case EBattleInputMode::Command:
+	{
+		if (InputTag == Tags.Input_Slot1) { UseSkill(0); return; }
+		if (InputTag == Tags.Input_Slot2) { UseSkill(1); return; }
+		if (InputTag == Tags.Input_Slot3) { UseSkill(2); return; }
+		if (InputTag == Tags.Input_Slot4) { UseSkill(3); return; }
+		if (InputTag == Tags.Input_Slot5) { UseSkill(4); return; }
+		if (InputTag == Tags.Input_Slot6) { UseSkill(5); return; }
+		if (InputTag == Tags.Input_X) { UseDefaultSkill(0); return; }
+		break;
+	}
+	case EBattleInputMode::Item:
+	{
+		if (InputTag == Tags.Input_Slot1) { OnItemSlotSelected.Broadcast(0); return; }
+		if (InputTag == Tags.Input_Slot2) { OnItemSlotSelected.Broadcast(1); return; }
+		if (InputTag == Tags.Input_Slot3) { OnItemSlotSelected.Broadcast(2); return; }
+		if (InputTag == Tags.Input_Slot4) { OnItemSlotSelected.Broadcast(3); return; }
+		if (InputTag == Tags.Input_Slot5) { OnItemSlotSelected.Broadcast(4); return; }
+		if (InputTag == Tags.Input_Slot6) { OnItemSlotSelected.Broadcast(5); return; }
+		break;
+	}
+	case EBattleInputMode::Capture:
+	{
+		if (InputTag == Tags.Input_Slot1) { OnCaptureSlotSelected.Broadcast(0); return; }
+		if (InputTag == Tags.Input_Slot2) { OnCaptureSlotSelected.Broadcast(1); return; }
+		if (InputTag == Tags.Input_Slot3) { OnCaptureSlotSelected.Broadcast(2); return; }
+		if (InputTag == Tags.Input_Slot4) { OnCaptureSlotSelected.Broadcast(3); return; }
+		if (InputTag == Tags.Input_Slot5) { OnCaptureSlotSelected.Broadcast(4); return; }
+		if (InputTag == Tags.Input_Slot6) { OnCaptureSlotSelected.Broadcast(5); return; }
+		if (InputTag == Tags.Input_X) { SetInputMode(EBattleInputMode::Crafting); return; }
+		break;
+	}
+	case EBattleInputMode::Crafting:
+	{
+		if (InputTag == Tags.Input_Slot1) { OnCraftingSlotSelected.Broadcast(0); return; }
+		if (InputTag == Tags.Input_Slot2) { OnCraftingSlotSelected.Broadcast(1); return; }
+		if (InputTag == Tags.Input_Slot3) { OnCraftingSlotSelected.Broadcast(2); return; }
+		if (InputTag == Tags.Input_Slot4) { OnCraftingSlotSelected.Broadcast(3); return; }
+		if (InputTag == Tags.Input_Slot5) { OnCraftingSlotSelected.Broadcast(4); return; }
+		if (InputTag == Tags.Input_Slot6) { OnCraftingSlotSelected.Broadcast(5); return; }
+		break;
+	}
+	}
 }
 
 void UElfBattleController::UseSkill(int32 SlotIndex)

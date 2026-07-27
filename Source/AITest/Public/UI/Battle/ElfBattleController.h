@@ -21,6 +21,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDamageAnimStep, int32, FromHP, i
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSkillSelected, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefaultSkillSelected, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBattleActionPhase);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInputModeChanged, EBattleInputMode, NewMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotSelected, int32, SlotIndex);
 
 UCLASS(BlueprintType)
 class AITEST_API UElfBattleController : public UObject
@@ -30,6 +32,13 @@ class AITEST_API UElfBattleController : public UObject
 public:
 	void Init(APlayerController* InOwner, EBattleType Type, AActor* Opponent);
 	void HandleInput(const FGameplayTag& InputTag);
+
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void SetInputMode(EBattleInputMode NewMode);
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	EBattleInputMode GetInputMode() const { return CurrentInputMode; }
+
 	void BroadcastHP();
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
@@ -165,6 +174,21 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnBattleActionPhase OnActionPhaseEnded;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnInputModeChanged OnInputModeChanged;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSlotSelected OnItemSlotSelected;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSlotSelected OnSwitchSlotSelected;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSlotSelected OnCaptureSlotSelected;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnSlotSelected OnCraftingSlotSelected;
+
 	UPROPERTY(BlueprintReadOnly)
 	int32 SelectedSlotIndex = 0;
 
@@ -177,4 +201,7 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly)
 	TObjectPtr<UElfBattleModel> BattleModel;
+
+	UPROPERTY()
+	EBattleInputMode CurrentInputMode = EBattleInputMode::Command;
 };

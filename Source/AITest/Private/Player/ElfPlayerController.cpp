@@ -155,6 +155,11 @@ void AElfPlayerController::EnterBattleMode(AActor* Opponent, EBattleType BattleT
 		Subsystem->RemoveMappingContext(WorldInputContext);
 	}
 
+	if (BattleInputContext)
+	{
+		Subsystem->AddMappingContext(BattleInputContext, 1);
+	}
+
 	UClass* BMClass = BattleManagerClass ? BattleManagerClass.Get() : UElfBattleManager::StaticClass();
 	BattleManager = NewObject<UElfBattleManager>(this, BMClass);
 	BattleManager->Init(UIManager, this);

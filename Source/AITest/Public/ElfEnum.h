@@ -43,3 +43,12 @@ enum class EBattleResult : uint8
 	Draw       UMETA(DisplayName = "平局"),
 	Run        UMETA(DisplayName = "逃跑")
 };
+
+UENUM(BlueprintType)
+enum class EBattleInputMode : uint8
+{
+	Command  UMETA(DisplayName = "技能选择"),
+	Item     UMETA(DisplayName = "道具"),
+	Capture  UMETA(DisplayName = "捕捉精灵"),
+	Crafting UMETA(DisplayName = "精灵球制作")
+};
