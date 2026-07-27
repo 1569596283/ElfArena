@@ -1,0 +1,40 @@
+# Visual Studio
+.vs/
+*.sln
+*.suo
+*.sdf
+*.opensdf
+*.vcxproj*
+*.vcxproj.user
+
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+*.sln.DotSettings.user
+
+# Binaries
+Binaries/
+
+# Derived Data Cache
+DerivedDataCache/
+
+# Intermediate files
+Intermediate/
+
+# Saved files
+Saved/
+
+# Build artifacts
+*.exe
+*.dll
+*.pdb
+*.lib
+*.exp
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
