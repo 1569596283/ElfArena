@@ -315,129 +315,206 @@ void UElfTurnManager::ResolveActions()
 
 void UElfTurnManager::OnExecutionTimer()
 {
+	if (bActionSetupDone)
+	{
+		ProcessNextAction();
+		return;
+	}
+
 	if (ActionQueue.Num() < 2)
 	{
 		EndTurn();
 		return;
 	}
 
-	FTurnAction& A = ActionQueue[0];
-	FTurnAction& B = ActionQueue[1];
-
+	FTurnAction A = ActionQueue[0];
+	FTurnAction B = ActionQueue[1];
 	ECounterState Counter = DetermineCounter(A, B);
-
 	if (Counter == ECounterState::FirstCountersSecond)
 	{
 		Swap(ActionQueue[0], ActionQueue[1]);
 	}
 
-	// 消耗待定战斗道具
+	A = ActionQueue[0];
+	B = ActionQueue[1];
+	if (Counter != ECounterState::None)
+	{
+		DisplayActions = { A, B };
+		ExecuteActions = { B, A };
+	}
+	else
+	{
+		DisplayActions = ActionQueue;
+		ExecuteActions = ActionQueue;
+	}
+
 	if (BattleController)
 	{
 		BattleController->ConsumePendingItem();
 	}
 
-	// 捕捉判定（在 Swift 和进化之前）
 	if (BattleController && BattleController->IsCapturePending())
 	{
 		ProcessCapture();
 		if (CurrentPhase == ETurnPhase::BattleEnd) return;
 	}
 
-	// 迅捷技能执行
 	if (!bSwiftDone)
 	{
 		TryExecuteSwiftSkills();
-		return; // Swift 用 Timer 链执行，完成后重新进 OnExecutionTimer
+		return;
 	}
 
-	// 首领化判定（速度快的先进化）
 	ProcessPendingEvolutions();
 
-	// 捕捉失败后跳过己方行动
 	if (bCaptureAttempted)
 	{
 		bCaptureAttempted = false;
-		// 移除玩家的 Action
 		ActionQueue.RemoveAll([](const FTurnAction& A) { return A.Side == EInfoSide::Self; });
+		DisplayActions = ActionQueue;
+		ExecuteActions = ActionQueue;
 	}
 
-	for (int32 i = 0; i < ActionQueue.Num(); i++)
+	bActionSetupDone = true;
+	BeginActionPipeline();
+}
+
+void UElfTurnManager::BeginActionPipeline()
+{
+	CurrentActionIndex = 0;
+	bInDisplayPhase = true;
+	bInExecutePhase = false;
+	ProcessNextAction();
+}
+
+void UElfTurnManager::ProcessNextAction()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	if (bInDisplayPhase)
 	{
-		const FTurnAction& Action = ActionQueue[i];
-
-		FElfCreatureInstance* Actor = GetActiveCreature(Action.Side);
-		if (!Actor || Actor->CurrentHP <= 0 || Action.SlotIndex < 0) continue;
-		if (!Action.bIsDefault && !Actor->EquippedSkills.IsValidIndex(Action.SlotIndex)) continue;
-
-		UElfSkillBase* SkillInstance = Action.bIsDefault
-			? GetActiveDefaultSkillInstance(Action.Side, Action.SlotIndex)
-			: GetActiveSkillInstance(Action.Side, Action.SlotIndex);
-		if (!SkillInstance) continue;
-
-		int32 Cost = FMath::Max(0, BuffManager->GetModifiedEnergyCost(Action.Side, SkillInstance->GetInstanceEnergyCost()));
-		Actor->CurrentEnergy = FMath::Max(0, Actor->CurrentEnergy - Cost);
-		SkillInstance->OnSkillUsed();
-		Actor->LastUsedSkillType = SkillInstance->GetSkillDataRef().SkillType;
-
-		if (Action.Side == EInfoSide::Self)
+		if (CurrentActionIndex < DisplayActions.Num())
 		{
-			BattleController->OnSelfCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+			const FTurnAction& Action = DisplayActions[CurrentActionIndex];
+			FName SkillRowName = GetActionSkillRowName(Action);
+			bool bIsCounter = false;
+			if (DisplayActions.Num() > 1 && ExecuteActions.Num() > 1 && ExecuteActions[0].Side != DisplayActions[0].Side)
+			{
+				bIsCounter = (CurrentActionIndex == 1);
+			}
+			if (BattleController)
+				BattleController->OnSkillDisplayStarted.Broadcast(Action.Side, SkillRowName, bIsCounter);
+
+			CurrentActionIndex++;
+			World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 1.5f, false);
 		}
 		else
 		{
-			BattleController->OnEnemyCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
-		}
+			if (BattleController)
+				BattleController->OnAllSkillsDisplayed.Broadcast();
 
-		float Modifier = 1.0f;
-		if (Counter != ECounterState::None)
+			bInDisplayPhase = false;
+			CurrentActionIndex = 0;
+			bInExecutePhase = true;
+			World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 0.5f, false);
+		}
+		return;
+	}
+
+	if (bInExecutePhase)
+	{
+		if (CurrentActionIndex < ExecuteActions.Num())
 		{
-			const FTurnAction& Other = ActionQueue[1 - i];
-			if (IsCounteredBy(Action, Other))
+			const FTurnAction& Action = ExecuteActions[CurrentActionIndex];
+			CurrentActionIndex++;
+			ExecuteTurnAction(Action);
+			if (CurrentPhase == ETurnPhase::BattleEnd) return;
+			if (!bForceSwitchPending)
 			{
-				Modifier = GetCounterModifier(Other);
+				World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 1.0f, false);
 			}
 		}
-
-		EInfoSide TargetSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
-
-		if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Attack)
+		else
 		{
-			ApplyAttack(Action.Side, Action.SlotIndex, TargetSide, Modifier);
+			bInExecutePhase = false;
+			if (BattleController)
+				BattleController->OnActionPhaseEnded.Broadcast();
+			ActionQueue.Empty();
+			EndTurn();
 		}
-		else if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Status)
-		{
-			ApplyStatusEffects(Action, SkillInstance);
-		}
-
-		EInfoSide DeathSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
-		CheckDeath(DeathSide);
-		if (CurrentPhase == ETurnPhase::BattleEnd) return;
-
-		// 愿力：任意技能使用后自动取消，恢复原技能
-		if (Action.Side == EInfoSide::Self && Actor->bWishActive)
-		{
-			BattleController->CancelWish();
-		}
-
-		// 离场检测
-		ForceSwitchSideCount = 0;
-		ForceSwitchCompleted = 0;
-		CheckSkillForcedSwitch(Action, SkillInstance);
-		if (bForceSwitchPending)
-		{
-			ProcessForcedSwitches();
-			return;
-		}
+		return;
 	}
+}
 
-	if (BattleController)
+FName UElfTurnManager::GetActionSkillRowName(const FTurnAction& Action)
+{
+	if (Action.bIsDefault)
 	{
-		BattleController->OnActionPhaseEnded.Broadcast();
+		UElfGameInstance* GI = GetGameInstance();
+		return GI && GI->DefaultSkillIDs.IsValidIndex(Action.SlotIndex) ? GI->DefaultSkillIDs[Action.SlotIndex] : NAME_None;
+	}
+	FElfCreatureInstance* Creature = GetActiveCreature(Action.Side);
+	return Creature && Creature->EquippedSkills.IsValidIndex(Action.SlotIndex) ? Creature->EquippedSkills[Action.SlotIndex] : NAME_None;
+}
+
+void UElfTurnManager::ExecuteTurnAction(const FTurnAction& Action)
+{
+	FElfCreatureInstance* Actor = GetActiveCreature(Action.Side);
+	if (!Actor || Actor->CurrentHP <= 0 || Action.SlotIndex < 0) return;
+	if (!Action.bIsDefault && !Actor->EquippedSkills.IsValidIndex(Action.SlotIndex)) return;
+
+	UElfSkillBase* SkillInstance = Action.bIsDefault
+		? GetActiveDefaultSkillInstance(Action.Side, Action.SlotIndex)
+		: GetActiveSkillInstance(Action.Side, Action.SlotIndex);
+	if (!SkillInstance) return;
+
+	int32 Cost = FMath::Max(0, BuffManager->GetModifiedEnergyCost(Action.Side, SkillInstance->GetInstanceEnergyCost()));
+	Actor->CurrentEnergy = FMath::Max(0, Actor->CurrentEnergy - Cost);
+	SkillInstance->OnSkillUsed();
+	Actor->LastUsedSkillType = SkillInstance->GetSkillDataRef().SkillType;
+
+	if (Action.Side == EInfoSide::Self)
+		BattleController->OnSelfCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+	else
+		BattleController->OnEnemyCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+
+	float Modifier = 1.0f;
+	for (int32 i = 0; i < ExecuteActions.Num(); i++)
+	{
+		if (ExecuteActions[i].Side == Action.Side && ExecuteActions[i].SlotIndex == Action.SlotIndex)
+		{
+			if (ExecuteActions.Num() > 1)
+			{
+				const FTurnAction& Other = ExecuteActions[1 - i];
+				if (IsCounteredBy(Action, Other))
+					Modifier = GetCounterModifier(Other);
+			}
+			break;
+		}
 	}
 
-	ActionQueue.Empty();
-	EndTurn();
+	EInfoSide TargetSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
+
+	if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Attack)
+		ApplyAttack(Action.Side, Action.SlotIndex, TargetSide, Modifier);
+	else if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Status)
+		ApplyStatusEffects(Action, SkillInstance);
+
+	EInfoSide DeathSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
+	CheckDeath(DeathSide);
+	if (CurrentPhase == ETurnPhase::BattleEnd) return;
+
+	if (Action.Side == EInfoSide::Self && Actor->bWishActive)
+		BattleController->CancelWish();
+
+	ForceSwitchSideCount = 0;
+	ForceSwitchCompleted = 0;
+	CheckSkillForcedSwitch(Action, SkillInstance);
+	if (bForceSwitchPending)
+	{
+		ProcessForcedSwitches();
+	}
 }
 
 UElfTurnManager::ECounterState UElfTurnManager::DetermineCounter(const FTurnAction& A, const FTurnAction& B) const
@@ -803,12 +880,11 @@ void UElfTurnManager::ResumeAfterForcedSwitch()
 	bForceSwitchPending = false;
 	if (BattleController) BattleController->SetInputModeLocked(false);
 
-	// 继续执行后续行动
 	UWorld* World = GetWorld();
 	if (World)
 	{
 		World->GetTimerManager().SetTimer(ExecutionTimer,
-			FTimerDelegate::CreateUObject(this, &UElfTurnManager::OnExecutionTimer),
+			FTimerDelegate::CreateUObject(this, &UElfTurnManager::ProcessNextAction),
 			0.5f, false);
 	}
 }

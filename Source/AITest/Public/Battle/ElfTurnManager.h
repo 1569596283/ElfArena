@@ -140,6 +140,11 @@ protected:
 	bool IsCounteredBy(const FTurnAction& Target, const FTurnAction& Counter) const;
 	float GetCounterModifier(const FTurnAction& Counter) const;
 	void ExecuteSingleAction(const FTurnAction& Action, float DamageModifier = 1.0f);
+	void ExecuteTurnAction(const FTurnAction& Action);
+
+	void ProcessNextAction();
+	void BeginActionPipeline();
+	FName GetActionSkillRowName(const FTurnAction& Action);
 
 	void ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfoSide TargetSide, float DamageModifier = 1.0f);
 	void ApplyStatusEffects(const FTurnAction& Action, UElfSkillBase* SkillInstance);
@@ -180,6 +185,14 @@ protected:
 	bool bRemoteActionChosen = false;
 
 	TArray<FTurnAction> ActionQueue;
+
+	// 逐行动作队列
+	TArray<FTurnAction> DisplayActions;
+	TArray<FTurnAction> ExecuteActions;
+	int32 CurrentActionIndex = 0;
+	bool bInDisplayPhase = false;
+	bool bInExecutePhase = false;
+	bool bActionSetupDone = false;
 
 	FTimerHandle ExecutionTimer;
 
