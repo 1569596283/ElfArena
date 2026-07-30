@@ -24,13 +24,16 @@ UENUM(BlueprintType)
 enum class ETurnPhase : uint8
 {
 	None              UMETA(DisplayName = "无"),
-	PlayerCommand     UMETA(DisplayName = "选择技能"),
+	BattleStart       UMETA(DisplayName = "进入战斗"),
+	SelectCreature    UMETA(DisplayName = "选择精灵"),
+	PlayerDecision    UMETA(DisplayName = "玩家决策"),
 	WaitingForOpponent UMETA(DisplayName = "等待对手"),
-	AIDecision        UMETA(DisplayName = "AI 决策"),
-	Resolving         UMETA(DisplayName = "行动排序"),
-	Executing         UMETA(DisplayName = "执行技能"),
+	CapturePhase       UMETA(DisplayName = "捕捉判定"),
+	EvolutionPhase    UMETA(DisplayName = "首领化"),
+	ManualSwitch      UMETA(DisplayName = "切换精灵"),
+	SkillExecution    UMETA(DisplayName = "精灵行动"),
+	ForcedSwitch      UMETA(DisplayName = "强制离场"),
 	TurnEnd           UMETA(DisplayName = "回合结束"),
-	Switch            UMETA(DisplayName = "切换精灵"),
 	BattleEnd         UMETA(DisplayName = "战斗结束")
 };
 
@@ -49,6 +52,7 @@ enum class EBattleInputMode : uint8
 {
 	Command  UMETA(DisplayName = "技能选择"),
 	Item     UMETA(DisplayName = "道具"),
+	Switch   UMETA(DisplayName = "切换精灵"),
 	Capture  UMETA(DisplayName = "捕捉精灵"),
 	Crafting UMETA(DisplayName = "精灵球制作")
 };

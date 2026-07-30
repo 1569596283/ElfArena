@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "ElfEnum.h"
 #include "UI/Battle/ElfPlayerInfo.h"
+#include "Data/ElfSkillData.h"
 #include "ElfBattleController.generated.h"
 
 class UElfBattleModel;
@@ -23,6 +24,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefaultSkillSelected, int32, Slot
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBattleActionPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInputModeChanged, EBattleInputMode, NewMode);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotSelected, int32, SlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemUsed, FName, ItemRowName, int32, RemainingUses);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattleItemClicked, FName, ItemRowName);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattlePhaseChanged, ETurnPhase, NewPhase);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPendingSlotChanged, int32, SlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCaptureConfirmed);
 
 UCLASS(BlueprintType)
 class AITEST_API UElfBattleController : public UObject
@@ -66,10 +72,86 @@ public:
 	EElfType GetSkillElementType(int32 SlotIndex) const;
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
+	EElfType GetActiveCreatureBloodline() const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
 	FName GetSkillRowName(int32 SlotIndex) const;
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void UseSkill(int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	bool UseItem(FName ItemRowName);
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	bool CanUseBattleItem(FName ItemRowName) const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetItemRemainingUses(FName ItemRowName) const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	bool IsItemCompatibleWithCreature(FName ItemRowName) const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	bool IsBattleItemUsedThisTurn() const { return bItemUsedThisTurn; }
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	bool IsCapturePending() const { return bCapturePending; }
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	float GetCaptureBallRate() const { return PendingCaptureBallRate; }
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetCaptureItemQuantity(FName ItemRowName) const { return CaptureItemQuantities.FindRef(ItemRowName); }
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetPendingSwitchSlot() const { return PendingSwitchSlot; }
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetPendingCaptureSlot() const { return PendingCaptureSlot; }
+
+	void InitCaptureItemQuantities();
+
+	void ClearCapturePending() { bCapturePending = false; PendingCaptureBallRate = 0.0f; }
+
+	void UseBattleItem();
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	FName GetBattleItemRowName();
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetBattleItemCount();
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	FName GetBattleItemAtSlot(int32 FlatIndex);
+
+	const TArray<FName>& GetBattleItemList();
+	void UseCaptureItem(int32 FlatIndex);
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetCaptureItemCount();
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	FName GetCaptureItemAtSlot(int32 FlatIndex);
+
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	const TArray<FName>& GetCaptureItemList();
+
+	void SetInputModeLocked(bool bLocked) { bInputModeLocked = bLocked; }
+
+	void SetCurrentTurnPhase(ETurnPhase NewPhase) { CurrentTurnPhase = NewPhase; }
+
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void CancelWish();
+
+	void RefundItem(FName ItemRowName);
+
+	void ResetBattleItemState() { bItemUsedThisTurn = false; PendingItemRowName = NAME_None; bCapturePending = false; PendingCaptureBallRate = 0.0f; }
+
+	void ConsumePendingItem();
+
+	FName FindBattleItemRowName(EEffectID EffectID);
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void UseDefaultSkill(int32 SlotIndex);
@@ -181,6 +263,18 @@ public:
 	FOnSlotSelected OnItemSlotSelected;
 
 	UPROPERTY(BlueprintAssignable)
+	FOnItemUsed OnItemUsed;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnBattleItemClicked OnBattleItemClicked;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnCaptureConfirmed OnCaptureConfirmed;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnBattlePhaseChanged OnBattlePhaseChanged;
+
+	UPROPERTY(BlueprintAssignable)
 	FOnSlotSelected OnSwitchSlotSelected;
 
 	UPROPERTY(BlueprintAssignable)
@@ -191,6 +285,18 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	int32 SelectedSlotIndex = 0;
+
+	bool bInputModeLocked = false;
+	ETurnPhase CurrentTurnPhase = ETurnPhase::None;
+
+	int32 PendingSwitchSlot = -1;
+	int32 PendingCaptureSlot = -1;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnPendingSlotChanged OnSwitchSlotHighlighted;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnPendingSlotChanged OnCaptureSlotHighlighted;
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bLocalPlayerReady = false;
@@ -204,4 +310,29 @@ protected:
 
 	UPROPERTY()
 	EBattleInputMode CurrentInputMode = EBattleInputMode::Command;
+
+	UPROPERTY()
+	TMap<FName, int32> ItemRemainingUses;
+
+	UPROPERTY()
+	bool bItemUsedThisTurn = false;
+
+	UPROPERTY()
+	FName PendingItemRowName;
+
+	UPROPERTY()
+	bool bCapturePending = false;
+
+	UPROPERTY()
+	float PendingCaptureBallRate = 0.0f;
+
+	UPROPERTY()
+	TMap<FName, int32> CaptureItemQuantities;
+
+	TArray<FName> CachedCaptureItemList;
+	TArray<FName> CachedBattleItemList;
+	int32 LastBattleItemActiveIndex = -1;
+
+	FName CachedWishRowName;
+	FName CachedEvoRowName;
 };

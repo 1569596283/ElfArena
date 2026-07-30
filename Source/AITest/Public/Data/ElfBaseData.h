@@ -21,7 +21,8 @@ enum class EElfType : uint8
 	Wind     UMETA(DisplayName = "风"),
 	Ice      UMETA(DisplayName = "冰"),
 	Dark     UMETA(DisplayName = "暗"),
-	Light    UMETA(DisplayName = "光")
+	Light    UMETA(DisplayName = "光"),
+	Leader   UMETA(DisplayName = "首领")
 };
 
 USTRUCT(BlueprintType)
@@ -95,6 +96,9 @@ struct FElfBaseData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "基础信息", meta = (DisplayName = "系别二"))
 	EElfType Type2 = EElfType::Normal;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "基础信息", meta = (DisplayName = "血脉属性", ToolTip = "默认与系别一相同。设为Leader时不可使用愿力，可进行超进化"))
+	EElfType Type3 = EElfType::Normal;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "蓝图", meta = (DisplayName = "大世界蓝图"))
 	TSoftClassPtr<class AElfWorldBase> WorldBlueprint;
 
@@ -130,4 +134,7 @@ struct FElfBaseData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "特性", meta = (DisplayName = "特性ID"))
 	FName AbilityID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "捕捉", meta = (DisplayName = "捕捉难度"))
+	float CaptureDifficulty = 1.0f;
 };

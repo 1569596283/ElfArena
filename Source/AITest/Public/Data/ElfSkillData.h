@@ -46,7 +46,11 @@ enum class EEffectType : uint8
 	HealHPPercent  UMETA(DisplayName = "回复生命百分比"),
 	RestoreEnergy  UMETA(DisplayName = "回复能量固定值"),
 	AddBuff        UMETA(DisplayName = "添加增益"),
-	AddDebuff      UMETA(DisplayName = "添加减益")
+	AddDebuff      UMETA(DisplayName = "添加减益"),
+	ForceSwitchSelf   UMETA(DisplayName = "己方离场"),
+	ForceSwitchEnemy  UMETA(DisplayName = "对方离场"),
+	ForceSwitchBoth   UMETA(DisplayName = "双方离场"),
+	Swift             UMETA(DisplayName = "迅捷")
 };
 
 UENUM(BlueprintType)
@@ -91,11 +95,14 @@ enum class EEffectID : uint8
 	EnterDrainEnergy      UMETA(DisplayName = "上场扣能"),
 	ModifyHitCount        UMETA(DisplayName = "连击数修正"),
 	DoubleHitCount        UMETA(DisplayName = "连击翻倍"),
-	BlockSwitch           UMETA(DisplayName = "禁止替换")
+	BlockSwitch           UMETA(DisplayName = "禁止替换"),
+
+	Evolution             UMETA(DisplayName = "超进化"),
+	WishSkill             UMETA(DisplayName = "愿力获得技能")
 };
 
 USTRUCT(BlueprintType)
-struct FEffectDef : public FTableRowBase
+struct FEffectData : public FTableRowBase
 {
 	GENERATED_BODY()
 

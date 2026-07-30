@@ -61,7 +61,13 @@ public:
 	void OnTurnSwitchRequested(EInfoSide Side, int32 NextSlotIndex);
 
 	UFUNCTION()
+	void OnForcedSwitchRequested(EInfoSide Side, int32 NextSlotIndex);
+
+	UFUNCTION()
 	void OnTurnBattleEnded(EBattleResult Result);
+
+	UFUNCTION()
+	void OnTurnPhaseChanged(ETurnPhase NewPhase);
 
 	UFUNCTION(BlueprintCallable)
 	void SkipToBattle();

@@ -106,15 +106,6 @@ EEnergyState UElfBattleSkill::GetEnergyState() const
 	return EEnergyState::Default;
 }
 
-UElfBattleController* UElfBattleSkill::GetBattleController() const
-{
-	if (!CachedBattleController)
-	{
-		CachedBattleController = Cast<UElfBattleController>(WidgetController);
-	}
-	return CachedBattleController;
-}
-
 void UElfBattleSkill::OnEnergyChanged(int32 NewEnergy)
 {
 	// Blueprint 实现更新 UI（能量不足时变红等）

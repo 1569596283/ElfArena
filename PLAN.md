@@ -356,27 +356,28 @@
 
 ### 10.1 数据结构
 
-**`DT_BuffDef`（`FEffectDef`，新增）** — Buff/印记定义表：
+**`DT_BuffDef`（`FEffectData`）** — Buff/印记定义表：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | Name | FText | 名称 |
 | Description | FText | 描述 |
 | Icon | TSoftObjectPtr\<UTexture2D\> | 图标 |
-| EffectID | FName | 效果ID，C++ 中匹配处理函数 |
-| TargetType | EBuffTargetType | Individual=增益减益, Side=印记 |
-| DefaultStackCount | int32 | 默认层数 |
-| DefaultDuration | int32 | 默认持续回合（-1=无限） |
-| bPersistent | bool | 退场是否保留 |
-| Params | TArray\<float\> | 通用参数列表 |
+| EffectID | `EEffectID`（枚举） | 效果ID，决定处理逻辑 |
+| TargetType | `EBuffTargetType` | Individual=增益减益, Side=印记 |
+| Duration | int32 | 持续回合（-1=无限） |
+| bPersistent | bool | 退场保留 |
+| TargetStat | `EElfBuffStat` | **StatModPercent/ModifyFlat** 时指定属性 |
+| Value | float | 主数值（百分比/数值/比例） |
+| SecondaryValue | float | 辅助数值（ModifyEnergyCostAndPower/TurnEndElementDamage） |
 
 **`FActiveBuff`（运行时）** — 作用中的 Buff 实例：
 
 | 字段 | 说明 |
 |------|------|
 | BuffDefRowName | 指向 `DT_BuffDef` 的行名 |
-| EffectID | 从定义表缓存的 EffectID |
-| Params | 从定义表缓存的参数 |
+| EffectID | `EEffectID` 枚举值 |
+| Params | `TArray<float>` 运行时参数（由配置字段转换而来） |
 | StackCount | 当前层数 |
 | RemainingTurns | 剩余回合（-1=无限） |
 | bPersistent | 退场保留 |
@@ -384,60 +385,226 @@
 
 **存储位置：**
 - 印记 → `FBattleSideData::SideBuffs`
-- 增益/减益 → `FElfCreatureInstance::ActiveBuffs`（已有）
+- 增益/减益 → `FElfCreatureInstance::ActiveBuffs`
 
 ### 10.2 技能配置
 
-`FSkillEffect` 中 `AddBuff`/`AddDebuff` 类型通过 `BuffHandle` 引用 `DT_BuffDef` 行：
+`FSkillEffect` 的 `AddBuff`/`AddDebuff` 通过 `BuffRowName` 引用 `DT_BuffDef`：
 ```
-Effects[0] = { Type: AddBuff, BuffHandle: "Buff_AtkUp" }
-Effects[1] = { Type: AddDebuff, BuffHandle: "Debuff_DefDown" }
+Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, Value: 10 }
 ```
 
-### 10.3 效果ID清单
+### 10.3 效果ID清单（`EEffectID` 枚举）
 
 #### 印记效果
 
-| # | EffectID | Params | 说明 | 钩子点 |
-|---|----------|--------|------|--------|
-| 1 | `ModifyEnergyCost` | `[costDelta]` | 技能能耗-1 | 能耗计算 |
-| 2 | `TurnEndRestoreEnergy` | `[amount]` | 回合结束恢复能量 | 回合结束 |
-| 3 | `ModifySpeed` | `[delta]` | 速度±N | 速度计算 |
-| 4 | `ModifyEnergyCostAndPower` | `[costDelta, powerPct]` | 能耗+1，威力+20% | 能耗+伤害 |
-| 5 | `ExtraBuffStack` | `[extra]` | 获得增益时额外一层 | 添加增益前 |
-| 6 | `TurnEndDamage` | `[maxHPPct]` | 回合结束HP%伤害 | 回合结束 |
-| 7 | `EnterDrainEnergy` | `[amount]` | 上场扣能 | 上场时 |
+| EffectID | Value | 说明 | 钩子点 |
+|----------|-------|------|--------|
+| `ModifyEnergyCost` | 能耗变化（负=减少） | 技能能耗修正 | 能耗计算 |
+| `TurnEndRestoreEnergy` | 回复量 | 回合结束恢复能量 | 回合结束 |
+| `ModifySpeed` | 速度变化 | 速度修正 | 速度计算 |
+| `ModifyEnergyCostAndPower` | Value=威力倍率, SecondaryValue=能耗变化 | 能耗+威力同时修正 | 能耗+伤害 |
+| `ExtraBuffStack` | 额外层数 | 获得增益时额外层数 | 添加增益前 |
+| `TurnEndDamage` | 最大生命比例(0.03=3%) | 回合结束伤害 | 回合结束 |
+| `EnterDrainEnergy` | 扣除量 | 上场扣能 | 上场时 |
 
 #### 增益/减益效果
 
-| # | EffectID | Params(statIdx=0..5) | 说明 |
-|---|----------|----------------------|------|
-| 1 | `StatModPercent` | `[statIdx, percent]` | ±% 属性 (ATK/MATK/DEF/MDEF) |
-| 2 | `ModifyFlat` | `[statIdx, value]` | ±N 速度(4)/威力(5) |
-| 3 | `ModifyHitCount` | `[delta]` | 连击数±N |
-| 4 | `ModifyEnergyCost` | `[costDelta]` | 能耗±N |
-| 5 | `DoubleHitCount` | `[]` | 连击数翻倍 |
-| 6 | `FreezeHP` | `[maxHPPct]` | 冻结HP% |
-| 7 | `TurnEndElementDamage` | `[elementType, maxHPPct]` | 回合结束属性伤害 |
-| 8 | `BlockSwitch` | `[]` | 禁止替换 |
+| EffectID | 参数 | 说明 |
+|----------|------|------|
+| `StatModPercent` | TargetStat=属性, Value=百分比(0.1=+10%) | 属性百分比修正 |
+| `ModifyFlat` | TargetStat=属性, Value=数值 | 属性固定值修正 |
+| `ModifySpeed` | Value=速度变化 | 速度修正 |
+| `ModifyEnergyCost` | Value=能耗变化 | 能耗修正 |
+| `ModifyHitCount` | Value=连击变化 | 连击数修正 |
+| `DoubleHitCount` | 无参数 | 连击翻倍 |
+| `FreezeHP` | Value=冻结比例(0.05=5%) | 冻结生命 |
+| `TurnEndElementDamage` | Value=最大生命比例, SecondaryValue=元素类型int | 回合结束属性伤害 |
+| `BlockSwitch` | 无参数 | 禁止替换 |
 
-### 10.4 钩子点
+### 10.4 管理类
 
-| 模块 | 位置 | 处理函数 |
-|------|------|---------|
-| 能量消耗 | `OnPlayerSkillSelected` / `OnExecutionTimer` | `GetModifiedEnergyCost()` |
-| 属性计算 | `ApplyAttack` | `GetModifiedStats()` |
-| 速度 | `GetEffectiveSpeed` | `GetModifiedSpeed()` |
-| 连击数 | `GetInstanceHitCount` | `GetModifiedHitCount()` |
-| 回合结束 | `EndTurn` | `ProcessTurnEndEffects()` |
-| 添加增益 | `ApplyBuffToTarget` | `OnBeforeAddBuff()` |
-| 禁止替换 | `OnPlayerSwitchRequest` | `IsSwitchBlocked()` |
-| 上场 | `ReleaseCreature` | `OnCreatureEnteredField()` |
-| Buff过期 | `EndTurn` | TickBuffs (lambda) |
-| 退场清理 | `RecallCreature` | 清除非持久 Buff |
+- **`UElfBuffManager`** — 独立的增益管理器，处理所有 Buff 添加/层叠/过期/钩子分发
+- `TurnManager` 通过 `BuffManager->` 委托调用，职责分离
 
-### 10.5 效果ID定义为静态 FName 常量
+## 11. 精灵血脉属性
 
-所有 EffectID 在 `UElfTurnManager.h` 中声明为 `static const FName`，在 `.cpp` 中定义，新增效果只需加一个 `FName` 和一条处理分支。
+### 11.1 第三属性
 
-## 11. 待补充…
+`FElfBaseData` 新增 `Type3`（血脉属性）：
+- 默认等于 `Type1`
+- **不参与属性克制计算**（攻击时不考虑血脉系的加成，被攻击时不计算克制/抵抗）
+- 编辑器中可为每个精灵独立设置
+
+### 11.2 首领血脉
+
+`EElfType` 增加 `Leader`（首领）枚举值：
+- `Type3 = Leader` → 首领血脉
+  - **可进化**：战斗中可使用首领化道具
+  - **不可使用愿力**
+- `Type3 != Leader` → 普通血脉
+  - **不可进化**
+  - **可使用愿力**
+
+## 12. 战斗道具系统
+
+### 12.1 数据表
+
+**`DT_Item`（`FItemData`）** — 通用道具表：
+
+| 字段 | 说明 |
+|------|------|
+| Name / Description / Icon | 基础信息 |
+| ItemType | `EItemType`（Battle/Capture/Material/SkillBook/Evolve/General） |
+| MaxBattleUses | 战斗中限用次数（仅 Battle 类型） |
+| EffectID | `EEffectID` 效果ID |
+| TargetRowName | 目标行名（愿力=技能ID） |
+| Params | 通用数值参数 |
+
+### 12.2 战斗道具
+
+**只有两种战斗道具，每局只能选一个使用：**
+
+| 道具 | EffectID | 效果 | 可用精灵 |
+|------|----------|------|---------|
+| 愿力 | `WishSkill` | 技能0替换为愿力冲击（血脉属性），用后恢复 | 非首领血脉 |
+| 首领化 | `Evolution` | 标记待进化，回合执行时进化 | 首领血脉 |
+
+**使用流程：**
+```
+点击 → PendingItemRowName 标记待定（不扣次数）
+       ├─ 愿力：立即替换技能0为愿力冲击
+       └─ 进化：标记 bPendingEvolution
+       
+取消 → 清空待定（愿力恢复技能0，进化清标记）
+
+回合执行 → ConsumePendingItem() 消耗次数
+```
+
+### 12.3 愿力冲击
+
+**`UAttackSkill_WishStrike`** → 继承 `UAttackSkillBase`：
+- 创建时 `SkillData.ElementType` 直接设为精灵当前血脉属性
+- 应对状态时额外伤害通过 `CounterEffects: [{Type: Power, Value: 150}]` 配置
+
+**愿力取消条件：**
+1. 再次点击愿力按钮 → 取消
+2. 使用非技能0的技能 → 自动取消
+3. 切换精灵 → 自动取消
+
+### 12.4 UI 查询
+
+`UElfBattleController` 提供了：
+
+| 函数 | 返回 | 说明 |
+|------|------|------|
+| `CanUseBattleItem(RowName)` | bool | 血统兼容、本回合未使用过 |
+| `GetItemRemainingUses(RowName)` | int32 | 剩余次数（自动处理互斥逻辑） |
+| `IsBattleItemUsedThisTurn()` | bool | 本回合是否已使用道具 |
+| `IsItemCompatibleWithCreature(RowName)` | bool | 仅检查血统兼容性 |
+| `FindBattleItemRowName(EffectID)` | FName | 通过 EffectID 查找道具行名 |
+
+## 13. 战斗输入系统
+
+### 13.1 键盘快捷键
+
+| 按键 | Command | Item | Capture | Crafting |
+|------|---------|------|---------|----------|
+| **1~6** | 选择技能 | 使用道具 | 广播`OnCaptureSlotSelected` | 广播`OnCraftingSlotSelected` |
+| **X** | 聚能 | — | → Crafting | — |
+| **Q** | → Item | — | — | — |
+| **E** | → Capture | — | — | — |
+| **R** | — | → Command | → Command | → Capture |
+
+### 13.2 输入模式
+
+`EBattleInputMode` 枚举 · `UElfBattleController::SetInputMode(NewMode)`：
+- `Command` → 技能选择
+- `Item` → 道具
+- `Capture` → 捕捉
+- `Crafting` → 精灵球制作
+
+切换时会广播 `OnInputModeChanged`，HUD 监听后切换面板。
+
+### 13.3 配置步骤
+
+1. 创建 `IA_Slot1~6` / `IA_X` / `IA_Q` / `IA_E` / `IA_R` Input Actions
+2. `IMC_Battle` 映射键盘按键到 Input Actions
+3. `DA_InputConfig` 中每行设 InputAction + Tag（`Input.Slot1` 等）
+4. `BP_PlayerController` 指定 `InputConfig` 和 `BattleInputContext`
+
+## 14. 战斗 UI
+
+### 14.1 HUD 面板切换
+
+```
+ElfBattleHUD（整体布局）
+├─ 双方信息区（HP/能量/等级）← 始终显示
+└─ WidgetSwitcher（操作面板）
+   ├─ Index 0: WBP_SkillPanel  (Command)
+   ├─ Index 1: WBP_ItemPanel   (Item)
+   ├─ Index 2: WBP_CapturePanel (Capture)
+   └─ Index 3: WBP_CraftingPanel (Crafting)
+```
+
+蓝图实现 `BP_OnInputModeChanged` 切换面板。
+
+### 14.2 道具按钮
+
+**`WBP_BattleItem`**（继承 `UElfBattleItem`）：
+
+| 函数 | 说明 |
+|------|------|
+| `Init(RowName)` | 初始化，`OnInit` 在蓝图重写 |
+| `OnClicked()` | 调用 `UseItem` + 广播 `OnBattleItemClicked` |
+| `GetRemainingUses()` | 剩余次数 |
+| `IsAvailable()` | 是否可用（剩余>0 && CanUseBattleItem） |
+| `IsSelectedThisTurn()` | 本回合是否已选中 |
+
+### 14.3 阶段监听
+
+`UElfBattleHUD` 自动绑定：
+- `OnInputModeChanged` → `BP_OnInputModeChanged`
+- `OnBattlePhaseChanged` → `BP_OnBattlePhaseChanged`
+
+## 15. 回合制战斗流程（完整）
+
+### 15.1 阶段顺序
+
+```
+BattleStart → 进入战斗
+SelectCreature → 选择精灵（可跳过）
+PlayerDecision → 玩家决策（技能/道具/切换）
+  │
+  │ 双方确认后
+  ▼
+WaitingForOpponent → 等待对手/AI决策
+EvolutionPhase → 首领化判定（速度排序，快的先进化）
+ManualSwitch → 手动切换精灵
+SkillExecution → 精灵行动（按速度+先制度执行技能）
+TurnEnd → 回合结束效果 + Buff 过期
+  │
+  ▼
+PlayerDecision（下一回合）
+```
+
+### 15.2 首领化
+
+- 使用进化道具后标记 `bPendingEvolution`
+- `ProcessPendingEvolutions()` 在 `SkillExecution` 前按速度排序执行
+- 进化后永久改变 `CreatureRowName`，属性重算，HP 按比例缩放
+- 切换精灵再上场仍是进化形态
+
+### 15.3 关于本回合已使用的标识
+
+- 任意道具点击/快捷键 → `bItemUsedThisTurn = true`
+- 下回合 `StartTurn()` 自动重置
+- 取消愿力时手动重置为 `false`
+
+## 16. 数据表设计规范
+
+- 所有数据表行结构后缀统一用 `Data`（`FEffectData`、`FItemData`、`FElfBaseData` 等）
+- `Def` 后缀不再使用
+- 类型枚举值通过 `EffectID` 识别，不依赖行名
+
+## 17. 待补充…

@@ -6,8 +6,10 @@
 #include "Skill/ElfSkillBase.h"
 #include "Skill/Attack/AttackSkillBase.h"
 #include "Data/ElfTypeChart.h"
+#include "Data/ElfStatCalculator.h"
 #include "Game/ElfGameInstance.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/ElfPlayerState.h"
 
 void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 {
@@ -25,11 +27,18 @@ void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 		BattleController->OnSkillSelected.AddDynamic(this, &UElfTurnManager::OnPlayerSkillSelected);
 		BattleController->OnDefaultSkillSelected.Clear();
 		BattleController->OnDefaultSkillSelected.AddDynamic(this, &UElfTurnManager::OnPlayerDefaultSkillSelected);
+		BattleController->OnCaptureConfirmed.Clear();
+		BattleController->OnCaptureConfirmed.AddDynamic(this, &UElfTurnManager::OnCaptureConfirmed);
 	}
 }
 
 void UElfTurnManager::StartTurn()
 {
+	if (BattleController)
+	{
+		BattleController->ResetBattleItemState();
+	}
+
 	PlayerChosenSlot = -1;
 	EnemyChosenSlot = -1;
 	PlayerDefaultSlotIndex = -1;
@@ -39,12 +48,12 @@ void UElfTurnManager::StartTurn()
 	bLocalActionChosen = false;
 	bRemoteActionChosen = false;
 
-	ChangePhase(ETurnPhase::PlayerCommand);
+	ChangePhase(ETurnPhase::PlayerDecision);
 }
 
 void UElfTurnManager::OnPlayerSkillSelected(int32 SlotIndex)
 {
-	if (CurrentPhase != ETurnPhase::PlayerCommand) return;
+	if (CurrentPhase != ETurnPhase::PlayerDecision) return;
 
 	FElfCreatureInstance* Creature = GetActiveCreature(EInfoSide::Self);
 	if (!Creature || !Creature->EquippedSkills.IsValidIndex(SlotIndex)) return;
@@ -63,6 +72,7 @@ void UElfTurnManager::OnPlayerSkillSelected(int32 SlotIndex)
 	}
 	else
 	{
+		ChangePhase(ETurnPhase::WaitingForOpponent);
 		ChooseEnemyAction();
 		OnPlayerActionReady();
 	}
@@ -70,7 +80,7 @@ void UElfTurnManager::OnPlayerSkillSelected(int32 SlotIndex)
 
 void UElfTurnManager::OnPlayerDefaultSkillSelected(int32 SlotIndex)
 {
-	if (CurrentPhase != ETurnPhase::PlayerCommand) return;
+	if (CurrentPhase != ETurnPhase::PlayerDecision) return;
 
 	FElfCreatureInstance* Creature = GetActiveCreature(EInfoSide::Self);
 	if (!Creature) return;
@@ -90,6 +100,7 @@ void UElfTurnManager::OnPlayerDefaultSkillSelected(int32 SlotIndex)
 	}
 	else
 	{
+		ChangePhase(ETurnPhase::WaitingForOpponent);
 		ChooseEnemyAction();
 		OnPlayerActionReady();
 	}
@@ -105,9 +116,16 @@ void UElfTurnManager::OnRemoteActionReceived(int32 SlotIndex)
 	OnPlayerActionReady();
 }
 
+void UElfTurnManager::OnCaptureConfirmed()
+{
+	if (CurrentPhase != ETurnPhase::PlayerDecision) return;
+	ChooseEnemyAction();
+	OnPlayerActionReady();
+}
+
 void UElfTurnManager::OnPlayerSwitchRequest(int32 SlotIndex)
 {
-	if (CurrentPhase != ETurnPhase::Switch && CurrentPhase != ETurnPhase::PlayerCommand) return;
+	if (CurrentPhase != ETurnPhase::ManualSwitch && CurrentPhase != ETurnPhase::PlayerDecision) return;
 
 	if (BuffManager->IsSwitchBlocked(EInfoSide::Self)) return;
 
@@ -117,7 +135,7 @@ void UElfTurnManager::OnPlayerSwitchRequest(int32 SlotIndex)
 		Current->LastUsedSkillType = ESkillType::Attack;
 	}
 
-	ChangePhase(ETurnPhase::Switch);
+	ChangePhase(ETurnPhase::ManualSwitch);
 	OnSwitchRequested.Broadcast(EInfoSide::Self, SlotIndex);
 
 	if (BattleModel && BattleModel->BattleType == EBattleType::PvP)
@@ -219,6 +237,10 @@ void UElfTurnManager::ChooseEnemyAction()
 void UElfTurnManager::ChangePhase(ETurnPhase NewPhase)
 {
 	CurrentPhase = NewPhase;
+	if (BattleController)
+	{
+		BattleController->SetCurrentTurnPhase(NewPhase);
+	}
 	OnTurnPhaseChanged.Broadcast(NewPhase);
 }
 
@@ -262,7 +284,7 @@ void UElfTurnManager::ResolveActions()
 		}
 	}
 
-	ChangePhase(ETurnPhase::Executing);
+	ChangePhase(ETurnPhase::SkillExecution);
 
 	if (BattleController)
 	{
@@ -280,6 +302,9 @@ void UElfTurnManager::ResolveActions()
 
 void UElfTurnManager::OnExecutionTimer()
 {
+	// 每回合重置 Swift 状态
+	bSwiftDone = false;
+
 	if (ActionQueue.Num() < 2)
 	{
 		EndTurn();
@@ -294,6 +319,37 @@ void UElfTurnManager::OnExecutionTimer()
 	if (Counter == ECounterState::FirstCountersSecond)
 	{
 		Swap(ActionQueue[0], ActionQueue[1]);
+	}
+
+	// 消耗待定战斗道具
+	if (BattleController)
+	{
+		BattleController->ConsumePendingItem();
+	}
+
+	// 捕捉判定（在 Swift 和进化之前）
+	if (BattleController && BattleController->IsCapturePending())
+	{
+		ProcessCapture();
+		if (CurrentPhase == ETurnPhase::BattleEnd) return;
+	}
+
+	// 迅捷技能执行
+	if (!bSwiftDone)
+	{
+		TryExecuteSwiftSkills();
+		return; // Swift 用 Timer 链执行，完成后重新进 OnExecutionTimer
+	}
+
+	// 首领化判定（速度快的先进化）
+	ProcessPendingEvolutions();
+
+	// 捕捉失败后跳过己方行动
+	if (bCaptureAttempted)
+	{
+		bCaptureAttempted = false;
+		// 移除玩家的 Action
+		ActionQueue.RemoveAll([](const FTurnAction& A) { return A.Side == EInfoSide::Self; });
 	}
 
 	for (int32 i = 0; i < ActionQueue.Num(); i++)
@@ -347,6 +403,22 @@ void UElfTurnManager::OnExecutionTimer()
 		EInfoSide DeathSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
 		CheckDeath(DeathSide);
 		if (CurrentPhase == ETurnPhase::BattleEnd) return;
+
+		// 愿力：任意技能使用后自动取消，恢复原技能
+		if (Action.Side == EInfoSide::Self && Actor->bWishActive)
+		{
+			BattleController->CancelWish();
+		}
+
+		// 离场检测
+		ForceSwitchSideCount = 0;
+		ForceSwitchCompleted = 0;
+		CheckSkillForcedSwitch(Action, SkillInstance);
+		if (bForceSwitchPending)
+		{
+			ProcessForcedSwitches();
+			return;
+		}
 	}
 
 	if (BattleController)
@@ -530,7 +602,7 @@ void UElfTurnManager::ApplyStatusEffects(const FTurnAction& Action, UElfSkillBas
 		{
 			if (!Effect.BuffRowName.IsNone())
 			{
-				const FEffectDef* Def = BuffManager->GetBuffDefCached(Effect.BuffRowName);
+				const FEffectData* Def = BuffManager->GetBuffDataCached(Effect.BuffRowName);
 				if (Def)
 				{
 					EInfoSide BuffTarget = (Effect.EffectTarget == EEffectTarget::Caster) ? Action.Side : TargetSide;
@@ -547,6 +619,411 @@ void UElfTurnManager::ApplyStatusEffects(const FTurnAction& Action, UElfSkillBas
 		default:
 			break;
 		}
+	}
+}
+
+void UElfTurnManager::ProcessPendingEvolutions()
+{
+	// 检查是否有待进化
+	auto HasPending = [&]() -> bool
+	{
+		for (EInfoSide S : { EInfoSide::Self, EInfoSide::Enemy })
+		{
+			FBattleSideData* Side = GetSide(S);
+			if (!Side) continue;
+			for (const FElfCreatureInstance& C : Side->Team)
+				if (C.bPendingEvolution) return true;
+		}
+		return false;
+	};
+
+	if (HasPending())
+	{
+		ChangePhase(ETurnPhase::EvolutionPhase);
+		// 进化完成后切回执行阶段
+		ChangePhase(ETurnPhase::SkillExecution);
+	}
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) return;
+
+	// 收集双方待进化精灵
+	struct FEvolutionEntry
+	{
+		EInfoSide Side;
+		int32 CreatureIndex;
+		int32 Speed;
+	};
+	TArray<FEvolutionEntry> Pending;
+	FBattleSideData* Sides[2] = { GetSide(EInfoSide::Self), GetSide(EInfoSide::Enemy) };
+	EInfoSide SideLabels[2] = { EInfoSide::Self, EInfoSide::Enemy };
+
+	for (int32 s = 0; s < 2; s++)
+	{
+		if (!Sides[s]) continue;
+		for (int32 i = 0; i < Sides[s]->Team.Num(); i++)
+		{
+			FElfCreatureInstance& Creature = Sides[s]->Team[i];
+			if (Creature.bPendingEvolution)
+			{
+				int32 Speed = Sides[s]->CalculatedStats.IsValidIndex(i) ? Sides[s]->CalculatedStats[i].SPD : 0;
+				Pending.Add({ SideLabels[s], i, Speed });
+			}
+		}
+	}
+
+	// 按速度排序（快优先）
+	Pending.Sort([](const FEvolutionEntry& A, const FEvolutionEntry& B) { return A.Speed > B.Speed; });
+
+	// 执行进化
+	for (const FEvolutionEntry& Entry : Pending)
+	{
+		FBattleSideData* SideData = Sides[Entry.Side == EInfoSide::Self ? 0 : 1];
+		FElfCreatureInstance& Creature = SideData->Team[Entry.CreatureIndex];
+		FElfBaseData BaseData;
+		if (GI->GetElfBaseData(Creature.CreatureRowName, BaseData) && !BaseData.EvolutionTarget.RowName.IsNone())
+		{
+			Creature.CreatureRowName = BaseData.EvolutionTarget.RowName;
+			Creature.bPendingEvolution = false;
+
+			FElfBaseData EvolvedBase;
+			if (GI->GetElfBaseData(Creature.CreatureRowName, EvolvedBase) && SideData->CalculatedStats.IsValidIndex(Entry.CreatureIndex))
+			{
+				FElfCalculatedStats& OldStats = SideData->CalculatedStats[Entry.CreatureIndex];
+				float HPPct = OldStats.MaxHP > 0 ? static_cast<float>(Creature.CurrentHP) / OldStats.MaxHP : 1.0f;
+				OldStats = UElfStatCalculator::CalculateStats(EvolvedBase);
+				Creature.CurrentHP = FMath::Max(1, FMath::RoundToInt(OldStats.MaxHP * HPPct));
+			}
+		}
+	}
+}
+
+void UElfTurnManager::CheckSkillForcedSwitch(const FTurnAction& Action, UElfSkillBase* SkillInstance)
+{
+	bForceSwitchPending = false;
+	ForceSwitchSideCount = 0;
+
+	EInfoSide SelfSide = Action.Side;
+	EInfoSide EnemySide = (SelfSide == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
+
+	auto CheckOne = [&](const TArray<FSkillEffect>& EffectList)
+	{
+		for (const FSkillEffect& Effect : EffectList)
+		{
+			if (Effect.Type == EEffectType::ForceSwitchSelf)
+			{
+				if (HasAliveBackup(SelfSide)) ForceSwitchSides[ForceSwitchSideCount++] = SelfSide;
+			}
+			else if (Effect.Type == EEffectType::ForceSwitchEnemy)
+			{
+				if (HasAliveBackup(EnemySide)) ForceSwitchSides[ForceSwitchSideCount++] = EnemySide;
+			}
+			else if (Effect.Type == EEffectType::ForceSwitchBoth)
+			{
+				if (HasAliveBackup(SelfSide)) ForceSwitchSides[ForceSwitchSideCount++] = SelfSide;
+				if (HasAliveBackup(EnemySide)) ForceSwitchSides[ForceSwitchSideCount++] = EnemySide;
+			}
+		}
+	};
+
+	CheckOne(SkillInstance->GetSkillDataRef().Effects);
+	if (SkillInstance->GetSkillDataRef().Counter)
+		CheckOne(SkillInstance->GetSkillDataRef().CounterEffects);
+
+	bForceSwitchPending = (ForceSwitchSideCount > 0);
+}
+
+void UElfTurnManager::ProcessForcedSwitches()
+{
+	ChangePhase(ETurnPhase::ForcedSwitch);
+	if (BattleController) BattleController->SetInputModeLocked(true);
+
+	for (int32 i = 0; i < ForceSwitchSideCount; i++)
+	{
+		EInfoSide Side = ForceSwitchSides[i];
+
+		if (Side == EInfoSide::Self)
+		{
+			// 玩家侧：广播等待选择
+			FBattleSideData* SideData = GetSide(Side);
+			if (!SideData) { ForceSwitchCompleted++; continue; }
+
+			int32 NextAlive = -1;
+			for (int32 j = 0; j < SideData->Team.Num(); j++)
+			{
+				if (SideData->Team[j].CurrentHP > 0 && j != SideData->ActiveIndex)
+				{
+					NextAlive = j;
+					break;
+				}
+			}
+			if (NextAlive >= 0)
+				OnForcedSwitchRequested.Broadcast(Side, NextAlive);
+			else
+				ForceSwitchCompleted++;
+		}
+		else
+		{
+			// AI/敌方：随机选
+			int32 NextAlive = PickRandomAliveCreature(Side);
+			if (NextAlive >= 0)
+			{
+				OnForcedSwitchRequested.Broadcast(Side, NextAlive);
+			}
+			ForceSwitchCompleted++;
+		}
+	}
+
+	// 如果不需要等待（全AI侧），直接恢复
+	if (ForceSwitchCompleted >= ForceSwitchSideCount)
+		ResumeAfterForcedSwitch();
+}
+
+void UElfTurnManager::OnForcedSwitchComplete()
+{
+	ForceSwitchCompleted++;
+	if (ForceSwitchCompleted >= ForceSwitchSideCount)
+	{
+		ResumeAfterForcedSwitch();
+	}
+}
+
+void UElfTurnManager::ResumeAfterForcedSwitch()
+{
+	bForceSwitchPending = false;
+	if (BattleController) BattleController->SetInputModeLocked(false);
+
+	// 继续执行后续行动
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(ExecutionTimer,
+			FTimerDelegate::CreateUObject(this, &UElfTurnManager::OnExecutionTimer),
+			0.5f, false);
+	}
+}
+
+bool UElfTurnManager::HasAliveBackup(EInfoSide Side) const
+{
+	FBattleSideData* SideData = (Side == EInfoSide::Self)
+		? (BattleModel ? &BattleModel->PlayerSide : nullptr)
+		: (BattleModel ? &BattleModel->EnemySide : nullptr);
+	if (!SideData) return false;
+
+	for (int32 i = 0; i < SideData->Team.Num(); i++)
+	{
+		if (i == SideData->ActiveIndex) continue;
+		if (SideData->Team[i].CurrentHP > 0) return true;
+	}
+	return false;
+}
+
+int32 UElfTurnManager::PickRandomAliveCreature(EInfoSide Side) const
+{
+	FBattleSideData* SideData = (Side == EInfoSide::Self)
+		? (BattleModel ? &BattleModel->PlayerSide : nullptr)
+		: (BattleModel ? &BattleModel->EnemySide : nullptr);
+	if (!SideData) return -1;
+
+	TArray<int32> Alive;
+	for (int32 i = 0; i < SideData->Team.Num(); i++)
+	{
+		if (i == SideData->ActiveIndex) continue;
+		if (SideData->Team[i].CurrentHP > 0) Alive.Add(i);
+	}
+	return Alive.IsEmpty() ? -1 : Alive[FMath::RandRange(0, Alive.Num() - 1)];
+}
+
+// ==================== 捕捉 ====================
+
+void UElfTurnManager::ProcessCapture()
+{
+	if (!BattleController || !BattleController->IsCapturePending()) return;
+
+	ChangePhase(ETurnPhase::CapturePhase);
+
+	FElfCreatureInstance* Target = GetActiveCreature(EInfoSide::Enemy);
+	if (!Target) { BattleController->ClearCapturePending(); return; }
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) { BattleController->ClearCapturePending(); return; }
+
+	FElfBaseData BaseData;
+	if (!GI->GetElfBaseData(Target->CreatureRowName, BaseData)) { BattleController->ClearCapturePending(); return; }
+
+	float Difficulty = FMath::Max(0.1f, BaseData.CaptureDifficulty);
+	float BallRate = FMath::Max(0.1f, BattleController->GetCaptureBallRate());
+	float Chance = BallRate / Difficulty;
+
+	bool bSuccess = FMath::FRandRange(0.0f, 1.0f) <= Chance;
+
+	BattleController->ClearCapturePending();
+	bCaptureAttempted = true;
+
+	if (bSuccess)
+	{
+		// 捕捉成功 → 精灵放入背包
+		AElfPlayerState* PS = BattleController->GetOwnerPC() ? BattleController->GetOwnerPC()->GetPlayerState<AElfPlayerState>() : nullptr;
+		if (PS)
+		{
+			TArray<FElfCreatureInstance>& Team = PS->GetTeamCreatures();
+			if (Team.Num() < 6)
+				Team.Add(*Target);
+			else
+				PS->GetWarehouseCreatures().Add(*Target);
+		}
+
+		// 敌方精灵移除
+		FBattleSideData* EnemySide = GetSide(EInfoSide::Enemy);
+		if (EnemySide)
+		{
+			Target->CurrentHP = 0;
+			EnemySide->MoveActiveToEnd();
+		}
+
+		CheckDeath(EInfoSide::Enemy);
+		if (CurrentPhase != ETurnPhase::BattleEnd)
+			EndBattle(EBattleResult::PlayerWin);
+	}
+
+	// 失败：玩家行动被跳过
+}
+
+// ==================== 迅捷 ====================
+
+struct FQueuedSwiftSkill
+{
+	EInfoSide Side;
+	int32 SlotIndex;
+	int32 Speed;
+};
+
+void UElfTurnManager::TryExecuteSwiftSkills()
+{
+	if (bSwiftDone) return;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) { bSwiftDone = true; return; }
+
+	TArray<FQueuedSwiftSkill> Queue;
+	FBattleSideData* Sides[2] = { GetSide(EInfoSide::Self), GetSide(EInfoSide::Enemy) };
+
+	for (int32 s = 0; s < 2; s++)
+	{
+		if (!Sides[s]) continue;
+		FElfCreatureInstance* Creature = Sides[s]->GetActiveCreature();
+		if (!Creature) continue;
+
+		int32 Speed = Sides[s]->CalculatedStats.IsValidIndex(Sides[s]->ActiveIndex)
+			? Sides[s]->CalculatedStats[Sides[s]->ActiveIndex].SPD : 0;
+
+		for (int32 j = 0; j < Creature->EquippedSkills.Num(); j++)
+		{
+			FName SkillRowName = Creature->EquippedSkills[j];
+			if (SkillRowName.IsNone()) continue;
+
+			FSkillData SkillData;
+			if (!GI->GetSkillData(SkillRowName, SkillData)) continue;
+
+			for (const FSkillEffect& Effect : SkillData.Effects)
+			{
+				if (Effect.Type != EEffectType::Swift) continue;
+
+				// 检查能量是否足够
+				EInfoSide SideEnum = (s == 0) ? EInfoSide::Self : EInfoSide::Enemy;
+				int32 Cost = SkillData.EnergyCost;
+				if (BuffManager) Cost = BuffManager->GetModifiedEnergyCost(SideEnum, Cost);
+				if (Creature->CurrentEnergy >= Cost)
+				{
+					// 记录 EffectTarget，但同一个技能只有一个 Swift 效果
+					Queue.Add({ SideEnum, j, Speed });
+				}
+				break; // 一个技能只有一个 Swift 效果
+			}
+		}
+	}
+
+	if (Queue.IsEmpty())
+	{
+		bSwiftDone = true;
+		OnSwiftSkillDone();
+		return;
+	}
+
+	// 按速度排序
+	Queue.Sort([](const FQueuedSwiftSkill& A, const FQueuedSwiftSkill& B) { return A.Speed > B.Speed; });
+
+	// 链式执行
+	for (int32 i = 0; i < Queue.Num(); i++)
+	{
+		ExecuteSwiftSkill(Queue[i].Side, Queue[i].SlotIndex);
+	}
+
+	bSwiftDone = true;
+	OnSwiftSkillDone();
+}
+
+void UElfTurnManager::ExecuteSwiftSkill(EInfoSide Side, int32 SkillSlotIndex)
+{
+	FElfCreatureInstance* Actor = GetActiveCreature(Side);
+	if (!Actor || !Actor->EquippedSkills.IsValidIndex(SkillSlotIndex)) return;
+
+	UElfSkillBase* SkillInstance = GetActiveSkillInstance(Side, SkillSlotIndex);
+	if (!SkillInstance) return;
+
+	// 扣能量
+	int32 Cost = SkillInstance->GetInstanceEnergyCost();
+	if (BuffManager) Cost = BuffManager->GetModifiedEnergyCost(Side, Cost);
+	Actor->CurrentEnergy = FMath::Max(0, Actor->CurrentEnergy - Cost);
+	SkillInstance->OnSkillUsed();
+	Actor->LastUsedSkillType = SkillInstance->GetSkillDataRef().SkillType;
+
+	if (Side == EInfoSide::Self)
+		BattleController->OnSelfCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+	else
+		BattleController->OnEnemyCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+
+	// 按技能类型执行
+	EInfoSide TargetSide = (Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
+
+	// 查找 Swift 效果的 EffectTarget
+	EInfoSide SkillTarget = TargetSide; // 默认目标
+	for (const FSkillEffect& Effect : SkillInstance->GetSkillDataRef().Effects)
+	{
+		if (Effect.Type == EEffectType::Swift)
+		{
+			SkillTarget = (Effect.EffectTarget == EEffectTarget::Caster) ? Side : TargetSide;
+			break;
+		}
+	}
+
+	if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Attack)
+	{
+		// 攻击迅捷：直接对目标造成伤害
+		ApplyAttack(Side, SkillSlotIndex, SkillTarget, 1.0f);
+	}
+	else if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Status)
+	{
+		FTurnAction SwiftAction;
+		SwiftAction.Side = Side;
+		SwiftAction.SlotIndex = SkillSlotIndex;
+		ApplyStatusEffects(SwiftAction, SkillInstance);
+	}
+
+	// 死亡判定
+	CheckDeath(TargetSide);
+}
+
+void UElfTurnManager::OnSwiftSkillDone()
+{
+	bSwiftDone = true;
+	// 重新进入 ExecutionTimer 继续主流程
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(ExecutionTimer,
+			FTimerDelegate::CreateUObject(this, &UElfTurnManager::OnExecutionTimer),
+			0.1f, false);
 	}
 }
 
@@ -598,7 +1075,7 @@ void UElfTurnManager::CheckDeath(EInfoSide Side)
 
 void UElfTurnManager::EnterSwitchPhase(EInfoSide Side)
 {
-	ChangePhase(ETurnPhase::Switch);
+	ChangePhase(ETurnPhase::ManualSwitch);
 
 	int32 NextAlive = -1;
 	FBattleSideData* SideData = GetSide(Side);
@@ -643,13 +1120,13 @@ void UElfTurnManager::OnCreatureEnteredField(EInfoSide Side)
 		BuffManager->OnCreatureEnteredField(Side);
 }
 
-void UElfTurnManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
+void UElfTurnManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
 {
 	if (BuffManager)
 		BuffManager->ApplyBuffToTarget(TargetSide, BuffDefRowName, Def, OverrideStack, OverrideDuration, bIsBuff);
 }
 
-void UElfTurnManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
+void UElfTurnManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
 {
 	if (BuffManager)
 		BuffManager->ApplyBuffToSide(Side, BuffDefRowName, Def, OverrideStack, OverrideDuration, bIsBuff);

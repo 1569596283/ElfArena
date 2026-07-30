@@ -132,10 +132,27 @@ void UElfBattleManager::OnPlayerReadyStateChanged(bool bIsReady)
 	}
 }
 
+void UElfBattleManager::OnForcedSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
+{
+	RecallCreature(Side);
+	ReleaseCreature(Side, NextSlotIndex);
+
+	if (TurnManager)
+		TurnManager->OnForcedSwitchComplete();
+}
+
 void UElfBattleManager::OnTurnSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
 {
 	RecallCreature(Side);
 	ReleaseCreature(Side, NextSlotIndex);
+}
+
+void UElfBattleManager::OnTurnPhaseChanged(ETurnPhase NewPhase)
+{
+	if (BattleController)
+	{
+		BattleController->OnBattlePhaseChanged.Broadcast(NewPhase);
+	}
 }
 
 void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
@@ -165,6 +182,7 @@ void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
 	if (AElfPlayerController* PC = Cast<AElfPlayerController>(OwnerPC))
 	{
 		PC->ExitBattleMode();
+		PC->SaveGame();
 	}
 }
 
@@ -178,10 +196,16 @@ void UElfBattleManager::RecallCreature(EInfoSide Side)
 	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &Model->PlayerSide : &Model->EnemySide;
 	if (SideData)
 	{
-		// 退场时清除非持久增益
 		FElfCreatureInstance* Creature = SideData->GetActiveCreature();
 		if (Creature)
 		{
+			// 切换精灵时取消愿力
+			if (Side == EInfoSide::Self && Creature->bWishActive)
+			{
+				BattleController->CancelWish();
+			}
+
+			// 退场时清除非持久增益
 			for (int32 i = Creature->ActiveBuffs.Num() - 1; i >= 0; i--)
 			{
 				if (!Creature->ActiveBuffs[i].bPersistent)
@@ -303,8 +327,11 @@ void UElfBattleManager::EnterBattle()
 
 	TurnManager->OnSwitchRequested.Clear();
 	TurnManager->OnSwitchRequested.AddDynamic(this, &UElfBattleManager::OnTurnSwitchRequested);
+	TurnManager->OnForcedSwitchRequested.Clear();
+	TurnManager->OnForcedSwitchRequested.AddDynamic(this, &UElfBattleManager::OnForcedSwitchRequested);
 	TurnManager->OnBattleEnded.Clear();
 	TurnManager->OnBattleEnded.AddDynamic(this, &UElfBattleManager::OnTurnBattleEnded);
+	TurnManager->OnTurnPhaseChanged.AddDynamic(this, &UElfBattleManager::OnTurnPhaseChanged);
 
 	SpawnBattleCreatures();
 	ReleaseCreature(EInfoSide::Self, BattleController ? BattleController->SelectedSlotIndex : 0);

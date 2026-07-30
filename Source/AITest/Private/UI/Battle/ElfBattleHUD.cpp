@@ -1,11 +1,25 @@
 #include "UI/Battle/ElfBattleHUD.h"
 #include "UI/Battle/ElfBattleController.h"
 
-UElfBattleController* UElfBattleHUD::GetBattleController() const
+void UElfBattleHUD::NativeConstruct()
 {
-	if (!CachedBattleController)
+	Super::NativeConstruct();
+
+	if (UElfBattleController* BC = GetBattleController())
 	{
-		CachedBattleController = Cast<UElfBattleController>(WidgetController);
+		BC->OnInputModeChanged.AddDynamic(this, &UElfBattleHUD::OnInputModeChanged);
+		BC->OnBattlePhaseChanged.AddDynamic(this, &UElfBattleHUD::OnBattlePhaseChanged);
 	}
-	return CachedBattleController;
 }
+
+void UElfBattleHUD::OnInputModeChanged(EBattleInputMode NewMode)
+{
+	BP_OnInputModeChanged(NewMode);
+}
+
+void UElfBattleHUD::OnBattlePhaseChanged(ETurnPhase NewPhase)
+{
+	BP_OnBattlePhaseChanged(NewPhase);
+}
+
+

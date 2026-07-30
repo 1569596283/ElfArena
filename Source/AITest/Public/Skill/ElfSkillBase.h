@@ -29,7 +29,7 @@ public:
 	int32 GetUseCount() const { return UseCount; }
 
 	UFUNCTION(BlueprintPure, Category = "技能")
-	FSkillData GetSkillDataRef() const { return SkillDataRef; }
+	virtual FSkillData GetSkillDataRef() const { return SkillDataRef; }
 
 protected:
 	UPROPERTY()

@@ -57,11 +57,4 @@ void UElfBattleSelect::HandleLongPress()
 	OnCreatureDetailRequested.Broadcast(Side, SlotIndex);
 }
 
-UElfBattleController* UElfBattleSelect::GetBattleController() const
-{
-	if (!CachedBattleController)
-	{
-		CachedBattleController = Cast<UElfBattleController>(WidgetController);
-	}
-	return CachedBattleController;
-}
+

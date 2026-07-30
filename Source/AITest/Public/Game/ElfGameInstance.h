@@ -10,6 +10,8 @@ class AITEST_API UElfGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
+	virtual void Init() override;
+
 	UPROPERTY(EditAnywhere, Category = "精灵数据")
 	TObjectPtr<UDataTable> ElfDataTable;
 
@@ -44,7 +46,15 @@ public:
 	TObjectPtr<UDataTable> TypeChartTable;
 
 	UPROPERTY(EditAnywhere, Category = "增益减益", meta = (DisplayName = "Buff定义表"))
-	TObjectPtr<UDataTable> BuffDefTable;
+	TObjectPtr<UDataTable> BuffDataTable;
+
+	UPROPERTY(EditAnywhere, Category = "道具", meta = (DisplayName = "道具表"))
+	TObjectPtr<UDataTable> ItemDataTable;
+
+	UPROPERTY()
+	TMap<FName, int32> CaptureItemQuantities;
+
+	void ReplenishCaptureItems();
 
 	// 快捷查询函数
 	UFUNCTION(BlueprintCallable, Category = "精灵数据")
@@ -72,5 +82,8 @@ public:
 	bool GetElfType(uint8 Type, struct FImageData& OutData) const;
 
 	UFUNCTION(BlueprintCallable, Category = "增益减益")
-	bool GetBuffDef(FName RowName, struct FEffectDef& OutData) const;
+	bool GetBuffData(FName RowName, struct FEffectData& OutData) const;
+
+	UFUNCTION(BlueprintCallable, Category = "道具")
+	bool GetItemData(FName RowName, struct FItemData& OutData) const;
 };

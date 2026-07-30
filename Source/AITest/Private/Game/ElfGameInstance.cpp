@@ -1,11 +1,19 @@
 #include "Game/ElfGameInstance.h"
 #include "Data/ElfBaseData.h"
 #include "Data/NPCData.h"
+#include "Data/ElfItemData.h"
 #include "Data/ImageData.h"
 #include "Data/ElfSkillData.h"
+#include "Data/ElfItemData.h"
 #include "Elf/ElfManager.h"
 #include "Engine/DataTable.h"
 #include "UObject/EnumProperty.h"
+
+void UElfGameInstance::Init()
+{
+	Super::Init();
+	ReplenishCaptureItems();
+}
 
 bool UElfGameInstance::GetElfBaseData(FName RowName, FElfBaseData& OutData) const
 {
@@ -105,11 +113,35 @@ bool UElfGameInstance::GetElfType(uint8 Type, FImageData& OutData) const
 	return true;
 }
 
-bool UElfGameInstance::GetBuffDef(FName RowName, FEffectDef& OutData) const
+void UElfGameInstance::ReplenishCaptureItems()
 {
-	if (!BuffDefTable || RowName.IsNone()) return false;
-	static const FString ContextStr(TEXT("BuffDefLookup"));
-	const FEffectDef* Found = BuffDefTable->FindRow<FEffectDef>(RowName, ContextStr);
+	if (!ItemDataTable) return;
+
+	static const FString Context(TEXT("ReplenishCapture"));
+	TArray<FName> RowNames = ItemDataTable->GetRowNames();
+	for (const FName& RowName : RowNames)
+	{
+		const FItemData* Item = ItemDataTable->FindRow<FItemData>(RowName, Context);
+		if (Item && Item->ItemType == EItemType::Capture)
+			CaptureItemQuantities.Add(RowName, 5);
+	}
+}
+
+bool UElfGameInstance::GetBuffData(FName RowName, FEffectData& OutData) const
+{
+	if (!BuffDataTable || RowName.IsNone()) return false;
+	static const FString ContextStr(TEXT("	BuffDataLookup"));
+		const FEffectData* Found = BuffDataTable->FindRow<FEffectData>(RowName, ContextStr);
+	if (!Found) return false;
+	OutData = *Found;
+	return true;
+}
+
+bool UElfGameInstance::GetItemData(FName RowName, FItemData& OutData) const
+{
+	if (!ItemDataTable || RowName.IsNone()) return false;
+	static const FString ContextStr(TEXT("	ItemDataLookup"));
+	const FItemData* Found = ItemDataTable->FindRow<FItemData>(RowName, ContextStr);
 	if (!Found) return false;
 	OutData = *Found;
 	return true;

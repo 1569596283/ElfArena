@@ -25,8 +25,8 @@ public:
 	void CollectActiveBuffs(EInfoSide Side, TArray<const FActiveBuff*>& OutBuffs);
 
 	// 添加 Buff/印记
-	void ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
-	void ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
+	void ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
+	void ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
 
 	// 钩子
 	int32 GetModifiedEnergyCost(EInfoSide Side, int32 BaseCost);
@@ -42,8 +42,8 @@ public:
 	void TickBuffs(EInfoSide Side);
 
 	// BuffDef 缓存
-	const FEffectDef* GetBuffDefCached(FName RowName) const;
-	void ClearCache() { BuffDefCache.Empty(); }
+	const FEffectData* GetBuffDataCached(FName RowName) const;
+	void ClearCache() { BuffDataCache.Empty(); }
 
 protected:
 	FBattleSideData* GetSide(EInfoSide Side);
@@ -57,5 +57,5 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UElfBattleModel> BattleModel;
 
-	mutable TMap<FName, FEffectDef> BuffDefCache;
+	mutable TMap<FName, FEffectData> BuffDataCache;
 };

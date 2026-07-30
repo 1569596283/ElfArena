@@ -1,13 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UI/ElfUserWidget.h"
+#include "UI/Battle/ElfBattleUserWidget.h"
 #include "ElfBattleSkill.generated.h"
 
-class UElfBattleController;
-
 UCLASS()
-class AITEST_API UElfBattleSkill : public UElfUserWidget
+class AITEST_API UElfBattleSkill : public UElfBattleUserWidget
 {
 	GENERATED_BODY()
 
@@ -20,9 +18,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "技能")
 	void OnClicked();
-
-	UFUNCTION(BlueprintPure, Category = "技能")
-	UElfBattleController* GetBattleController() const;
 
 	UFUNCTION(BlueprintPure, Category = "技能")
 	int32 GetSkillEnergyCost() const;
@@ -49,5 +44,4 @@ private:
 	UFUNCTION()
 	void OnEnergyChanged(int32 NewEnergy);
 
-	mutable TObjectPtr<UElfBattleController> CachedBattleController = nullptr;
 };

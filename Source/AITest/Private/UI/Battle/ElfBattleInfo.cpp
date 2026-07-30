@@ -8,15 +8,6 @@ void UElfBattleInfo::Init(EInfoSide InSide)
 	OnInit(InSide);
 }
 
-UElfBattleController* UElfBattleInfo::GetBattleController() const
-{
-	if (!CachedBattleController)
-	{
-		CachedBattleController = Cast<UElfBattleController>(WidgetController);
-	}
-	return CachedBattleController;
-}
-
 void UElfBattleInfo::GetCurrentStats(int32& OutHP, int32& OutMaxHP, int32& OutEnergy) const
 {
 	OutHP = 0;

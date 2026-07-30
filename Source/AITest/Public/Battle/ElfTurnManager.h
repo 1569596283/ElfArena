@@ -18,6 +18,7 @@ struct FBattleSideData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnPhaseChanged, ETurnPhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSwitchRequested, EInfoSide, Side, int32, NextSlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnForcedSwitchRequested, EInfoSide, Side, int32, NextSlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattleEnded, EBattleResult, Result);
 
 UCLASS()
@@ -36,6 +37,9 @@ public:
 	UFUNCTION()
 	void OnPlayerDefaultSkillSelected(int32 SlotIndex);
 
+	UFUNCTION()
+	void OnCaptureConfirmed();
+
 	void OnRemoteActionReceived(int32 SlotIndex);
 
 	void OnPlayerSwitchRequest(int32 SlotIndex);
@@ -44,7 +48,7 @@ public:
 	ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
 
 	UFUNCTION(BlueprintPure)
-	bool IsWaitingForInput() const { return CurrentPhase == ETurnPhase::PlayerCommand; }
+	bool IsWaitingForInput() const { return CurrentPhase == ETurnPhase::PlayerDecision; }
 
 	int32 ChooseEnemySkill();
 
@@ -55,14 +59,35 @@ public:
 
 	void OnCreatureEnteredField(EInfoSide Side);
 
-	void ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
-	void ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
+	// BattleManager 切换完成后回调
+	void OnForcedSwitchComplete();
+
+	// 迅捷
+	bool bSwiftDone = false;
+
+	// 捕捉
+	bool bCaptureAttempted = false;
+	void ProcessCapture();
+
+	// 离场机制
+	bool bForceSwitchPending = false;
+	EInfoSide ForceSwitchSides[2];
+	int32 ForceSwitchSideCount = 0;
+	int32 ForceSwitchCompleted = 0;
+
+	void ProcessPendingEvolutions();
+
+	void ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
+	void ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
 
 	UPROPERTY(BlueprintAssignable)
 	FOnTurnPhaseChanged OnTurnPhaseChanged;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnSwitchRequested OnSwitchRequested;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnForcedSwitchRequested OnForcedSwitchRequested;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnBattleEnded OnBattleEnded;
@@ -88,6 +113,17 @@ protected:
 		int32 SlotIndex;
 		bool bIsDefault = false;
 	};
+
+	void ProcessForcedSwitches();
+	void ResumeAfterForcedSwitch();
+	bool HasAliveBackup(EInfoSide Side) const;
+
+	// 迅捷
+	void TryExecuteSwiftSkills();
+	void ExecuteSwiftSkill(EInfoSide Side, int32 SkillSlotIndex);
+	void OnSwiftSkillDone();
+	int32 PickRandomAliveCreature(EInfoSide Side) const;
+	void CheckSkillForcedSwitch(const FTurnAction& Action, UElfSkillBase* SkillInstance);
 
 	UFUNCTION()
 	void ChangePhase(ETurnPhase NewPhase);

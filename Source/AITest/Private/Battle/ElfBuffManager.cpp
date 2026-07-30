@@ -7,7 +7,7 @@ void UElfBuffManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 {
 	BattleController = InBC;
 	BattleModel = InBM;
-	BuffDefCache.Empty();
+	BuffDataCache.Empty();
 }
 
 void UElfBuffManager::CollectActiveBuffs(EInfoSide Side, TArray<const FActiveBuff*>& OutBuffs)
@@ -26,20 +26,20 @@ void UElfBuffManager::CollectActiveBuffs(EInfoSide Side, TArray<const FActiveBuf
 	}
 }
 
-const FEffectDef* UElfBuffManager::GetBuffDefCached(FName RowName) const
+const FEffectData* UElfBuffManager::GetBuffDataCached(FName RowName) const
 {
 	if (RowName.IsNone()) return nullptr;
-	if (const FEffectDef* Cached = BuffDefCache.Find(RowName))
+	if (const FEffectData* Cached = BuffDataCache.Find(RowName))
 		return Cached;
 	UElfGameInstance* GI = GetGameInstance();
 	if (!GI) return nullptr;
-	FEffectDef Def;
-	if (GI->GetBuffDef(RowName, Def))
-		return &BuffDefCache.Add(RowName, Def);
+	FEffectData Def;
+	if (GI->GetBuffData(RowName, Def))
+		return &BuffDataCache.Add(RowName, Def);
 	return nullptr;
 }
 
-static TArray<float> BuildParamsFromDef(const FEffectDef& Def)
+static TArray<float> BuildParamsFromDef(const FEffectData& Def)
 {
 	TArray<float> P;
 	if (Def.EffectID == EEffectID::StatModPercent)
@@ -97,7 +97,7 @@ static TArray<float> BuildParamsFromDef(const FEffectDef& Def)
 	return P;
 }
 
-void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
+void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
 {
 	FElfCreatureInstance* Target = GetActiveCreature(TargetSide);
 	if (!Target) return;
@@ -127,7 +127,7 @@ void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowNa
 	Target->ActiveBuffs.Add(NewBuff);
 }
 
-void UElfBuffManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectDef& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
+void UElfBuffManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
 {
 	FBattleSideData* SideData = GetSide(Side);
 	if (!SideData) return;

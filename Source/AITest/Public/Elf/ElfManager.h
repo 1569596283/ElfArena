@@ -139,6 +139,15 @@ struct FElfCreatureInstance
 	UPROPERTY()
 	ESkillType LastUsedSkillType = ESkillType::Attack;
 
+	UPROPERTY()
+	bool bWishActive = false;
+
+	UPROPERTY()
+	bool bPendingEvolution = false;
+
+	UPROPERTY()
+	FName BackupFirstSkill;
+
 	FElfCreatureInstance()
 	{
 		CreatureID = FGuid::NewGuid();
