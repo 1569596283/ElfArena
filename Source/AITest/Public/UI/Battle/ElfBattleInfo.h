@@ -20,6 +20,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "信息")
 	void GetCurrentStats(int32& OutHP, int32& OutMaxHP, int32& OutEnergy) const;
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "信息")
+	void BP_OnHPChanged(int32 CurrentHP, int32 MaxHP);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "信息")
+	void BP_OnEnergyChanged(int32 NewEnergy);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "信息")
+	void BP_OnCreatureSwitched();
+
 	UPROPERTY(BlueprintReadOnly, Category = "信息")
 	EInfoSide Side;
+
+private:
+	UFUNCTION()
+	void OnHPChanged(int32 NewHP, int32 MaxHP);
+
+	UFUNCTION()
+	void OnEnergyChanged(int32 NewEnergy);
+
+	UFUNCTION()
+	void OnCreatureSwitched(EInfoSide InSide);
 };

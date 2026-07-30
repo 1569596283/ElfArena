@@ -37,6 +37,23 @@ void UElfBattleManager::PlaySpawnAnimation(AActor* CreatureActor, float Duration
 	}
 }
 
+void UElfBattleManager::PlayRecallAnimation(AActor* CreatureActor, float Duration)
+{
+	if (!CreatureActor) return;
+
+	CreatureActor->SetActorScale3D(FVector::OneVector);
+
+	FRecallAnim Anim;
+	Anim.Actor = CreatureActor;
+	Anim.Duration = Duration;
+	ActiveRecallAnimations.Add(Anim);
+
+	if (!AnimTimerHandle.IsValid())
+	{
+		GetWorld()->GetTimerManager().SetTimer(AnimTimerHandle, this, &UElfBattleManager::TickScaleAnimations, 0.016f, true);
+	}
+}
+
 void UElfBattleManager::TickScaleAnimations()
 {
 	for (int32 i = ActiveAnimations.Num() - 1; i >= 0; --i)
@@ -60,7 +77,43 @@ void UElfBattleManager::TickScaleAnimations()
 		}
 	}
 
-	if (ActiveAnimations.IsEmpty() && AnimTimerHandle.IsValid())
+		for (int32 i = ActiveRecallAnimations.Num() - 1; i >= 0; --i)
+		{
+			FRecallAnim& Anim = ActiveRecallAnimations[i];
+			AActor* Actor = Anim.Actor.Get();
+			if (!Actor)
+			{
+				ActiveRecallAnimations.RemoveAt(i);
+				if (bRecallPending) DelayedRelease();
+				continue;
+			}
+
+			Anim.Elapsed += 0.016f;
+			float T = FMath::Clamp(Anim.Elapsed / Anim.Duration, 0.0f, 1.0f);
+			FVector Scale = FMath::Lerp(FVector::OneVector, FVector::ZeroVector, T);
+			Actor->SetActorScale3D(Scale);
+
+			if (T >= 1.0f)
+			{
+				// 销毁该 Actor 并从战场列表中移除
+				BattleCreatures.Remove(Actor);
+				for (auto It = FieldCreatures.CreateIterator(); It; ++It)
+				{
+					if (It.Value() == Actor)
+					{
+						It.RemoveCurrent();
+						break;
+					}
+				}
+				Actor->Destroy();
+				ActiveRecallAnimations.RemoveAt(i);
+
+				// 退场动画完成，0.5秒后释放新精灵
+				if (bRecallPending) DelayedRelease();
+			}
+		}
+
+	if (ActiveAnimations.IsEmpty() && ActiveRecallAnimations.IsEmpty() && AnimTimerHandle.IsValid())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(AnimTimerHandle);
 	}
@@ -134,17 +187,12 @@ void UElfBattleManager::OnPlayerReadyStateChanged(bool bIsReady)
 
 void UElfBattleManager::OnForcedSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
 {
-	RecallCreature(Side);
-	ReleaseCreature(Side, NextSlotIndex);
-
-	if (TurnManager)
-		TurnManager->OnForcedSwitchComplete();
+	RecallCreature(Side, NextSlotIndex, true);
 }
 
 void UElfBattleManager::OnTurnSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
 {
-	RecallCreature(Side);
-	ReleaseCreature(Side, NextSlotIndex);
+	RecallCreature(Side, NextSlotIndex, false);
 }
 
 void UElfBattleManager::OnTurnPhaseChanged(ETurnPhase NewPhase)
@@ -157,7 +205,6 @@ void UElfBattleManager::OnTurnPhaseChanged(ETurnPhase NewPhase)
 
 void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
 {
-	// 战斗结束清除所有 Buff
 	if (UElfBattleModel* Model = BattleController ? BattleController->GetBattleModel() : nullptr)
 	{
 		for (FElfCreatureInstance& C : Model->PlayerSide.Team)
@@ -170,6 +217,7 @@ void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
 
 	CloseCurrentUI();
 
+	// 销毁还在场的精灵（包括正在播放退场动画的）
 	for (AActor* Creature : BattleCreatures)
 	{
 		if (Creature)
@@ -178,6 +226,14 @@ void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
 		}
 	}
 	BattleCreatures.Empty();
+	FieldCreatures.Empty();
+	ActiveAnimations.Empty();
+	ActiveRecallAnimations.Empty();
+
+	if (AnimTimerHandle.IsValid())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(AnimTimerHandle);
+	}
 
 	if (AElfPlayerController* PC = Cast<AElfPlayerController>(OwnerPC))
 	{
@@ -186,12 +242,18 @@ void UElfBattleManager::OnTurnBattleEnded(EBattleResult Result)
 	}
 }
 
-void UElfBattleManager::RecallCreature(EInfoSide Side)
+void UElfBattleManager::RecallCreature(EInfoSide Side, int32 NextSlotIndex, bool bForced)
 {
 	if (!BattleController) return;
 
 	UElfBattleModel* Model = BattleController->GetBattleModel();
 	if (!Model) return;
+
+	// 播放退场动画
+	if (AActor* FieldActor = FieldCreatures.FindRef(Side))
+	{
+		PlayRecallAnimation(FieldActor, 0.3f);
+	}
 
 	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &Model->PlayerSide : &Model->EnemySide;
 	if (SideData)
@@ -199,13 +261,11 @@ void UElfBattleManager::RecallCreature(EInfoSide Side)
 		FElfCreatureInstance* Creature = SideData->GetActiveCreature();
 		if (Creature)
 		{
-			// 切换精灵时取消愿力
 			if (Side == EInfoSide::Self && Creature->bWishActive)
 			{
 				BattleController->CancelWish();
 			}
 
-			// 退场时清除非持久增益
 			for (int32 i = Creature->ActiveBuffs.Num() - 1; i >= 0; i--)
 			{
 				if (!Creature->ActiveBuffs[i].bPersistent)
@@ -216,6 +276,34 @@ void UElfBattleManager::RecallCreature(EInfoSide Side)
 		}
 		SideData->MoveActiveToEnd();
 	}
+
+	// 记录待释放信息，退场动画完成后执行
+	if (NextSlotIndex >= 0)
+	{
+		bRecallPending = true;
+		PendingReleaseSide = Side;
+		PendingReleaseSlot = NextSlotIndex;
+		bPendingReleaseIsForced = bForced;
+	}
+}
+
+void UElfBattleManager::ExecutePendingRelease()
+{
+	if (!bRecallPending) return;
+	bRecallPending = false;
+
+	ReleaseCreature(PendingReleaseSide, PendingReleaseSlot);
+
+	if (bPendingReleaseIsForced && TurnManager)
+	{
+		TurnManager->OnForcedSwitchComplete();
+	}
+}
+
+void UElfBattleManager::DelayedRelease()
+{
+	FTimerHandle Handle;
+	GetWorld()->GetTimerManager().SetTimer(Handle, this, &UElfBattleManager::ExecutePendingRelease, 0.5f, false);
 }
 
 AActor* UElfBattleManager::ReleaseCreature(EInfoSide Side, int32 SlotIndex)
@@ -245,6 +333,9 @@ AActor* UElfBattleManager::ReleaseCreature(EInfoSide Side, int32 SlotIndex)
 	AActor* Spawned = SpawnCreature(*SideData->GetActiveCreature(), SpawnPoint);
 	if (Spawned)
 	{
+		// 记录场上的精灵
+		FieldCreatures.Add(Side, Spawned);
+
 		PlaySpawnAnimation(Spawned, 0.4f);
 		if (BattleController)
 		{
@@ -252,7 +343,6 @@ AActor* UElfBattleManager::ReleaseCreature(EInfoSide Side, int32 SlotIndex)
 			BattleController->BroadcastHP();
 		}
 
-		// 上场触发印记效果
 		if (TurnManager)
 		{
 			TurnManager->OnCreatureEnteredField(Side);
@@ -312,7 +402,11 @@ void UElfBattleManager::SpawnBattleCreatures()
 
 	if (BattleType == EBattleType::Wild)
 	{
-		SpawnCreature(Model->EnemySide.Team[Model->EnemySide.ActiveIndex], Scene->EnemySpawnPoint);
+		AActor* Spawned = SpawnCreature(Model->EnemySide.Team[Model->EnemySide.ActiveIndex], Scene->EnemySpawnPoint);
+		if (Spawned)
+		{
+			FieldCreatures.Add(EInfoSide::Enemy, Spawned);
+		}
 	}
 }
 
@@ -320,7 +414,6 @@ void UElfBattleManager::EnterBattle()
 {
 	CurrentPhase = EBattlePhase::Battle;
 
-	// Create TurnManager early so buff system can hook into creature releases
 	TurnManager = NewObject<UElfTurnManager>(this);
 	UElfBattleModel* Model = BattleController ? BattleController->GetBattleModel() : nullptr;
 	TurnManager->Init(BattleController, Model);
@@ -361,7 +454,6 @@ void UElfBattleManager::EnterBattle()
 			ReleaseCreature(EInfoSide::Enemy, RandomIdx);
 		}
 
-		// Wild: enemy creature already spawned via SpawnBattleCreatures, trigger its enter effects
 		if (BattleType == EBattleType::Wild)
 		{
 			TurnManager->OnCreatureEnteredField(EInfoSide::Enemy);

@@ -111,56 +111,78 @@
 - 数据表：`DT_ElfSkill`
 
 ### 回合制战斗（UElfTurnManager）
-- **回合状态机**：`PlayerCommand → WaitingForOpponent(PvP) / AIDecision(PvE) → Resolving → Executing → TurnEnd → Switch → BattleEnd`
+- **回合状态机**：`BattleStart → SelectCreature → PlayerDecision → WaitingForOpponent → CapturePhase → EvolutionPhase → ForcedSwitch → SkillExecution → TurnEnd`
 - **行动排序**：按先制度 → 速度 → 随机
-- 技能执行管线：扣能量 → 标记使用 → 应用伤害/效果 → 死亡判定
-- 双方技能依次发动，3 秒执行窗口
-- `OnActionPhaseStarted / OnActionPhaseEnded` 事件（HUD 隐藏/显示 UI）
-- **防御连用限制**：同一精灵不能连续两回合使用防御
-- 主动换人算一次行动，重置防御标记
-- 技能同 CDO → 独立实例化（`UElfSkillBase` 子类每个精灵独立）
+- **应对系统（Counter）**：攻击→状态 增伤，防御→攻击 减伤，状态→防御 增益，通过 `CounterEffects` 配置
+- 技能执行管线：扣能量（Buff修正）→ 标记使用 → 应用伤害+效果 → 死亡判定 → 离场检测
+- Swift 技能执行：上场时自动释放，按速度排序
+- `OnActionPhaseStarted / OnActionPhaseEnded` 事件
+- `OnBattlePhaseChanged` — 阶段广播供 UI 使用
+- 防连续防御限制
+- 技能独立实例化
+
+### 增益减益系统（UElfBuffManager）
+- `DT_BuffDef`（`FEffectData`）数据表
+- `EEffectID` 枚举驱动，14 种效果
+- 印记（SideBuffs）和个体增益（ActiveBuffs）
+- 自动层叠、过期 tick、退场清理
+- 技能能量/速度/属性/连击数修正
+
+### 战斗输入系统
+- EnhancedInput + `IMC_Battle` + `DA_InputConfig`
+- Q=道具 W=捕捉 E=切换 R=技能 Space=确认 X=聚能
+- 五种输入模式：Command / Item / Switch / Capture / Crafting
+- 选中→确认两阶段流程（高亮 + Space）
+- `OnInputModeChanged` 事件驱动 UI 面板切换
+
+### 战斗道具系统
+- `DT_Item`（`FItemData`）通用道具表
+- **愿力**：替换技能0 → 愿力冲击（血脉属性），自动取消/恢复
+- **首领化**：首领血脉可用，速度排序，永久保留
+- 每局只能选一个，延迟消耗（回合执行时扣次数）
+- 道具按钮 `UElfBattleItem` 按索引初始化
+
+### 捕捉系统
+- 精灵球 `ItemType == Capture`
+- 按索引获取，翻页由 UI 切片
+- 概率公式：`捕捉能力 / 捕捉难度`
+- 成功→加入背包/仓库，失败→跳过己方行动
+- 数量跨战斗保留，进游戏补满5个
+
+### 迅捷（Swift）
+- 技能效果 `EEffectType::Swift`
+- 手动切换上场时自动检查并执行
+- 按速度排序，链式 Tick 执行
+
+### 离场（ForceSwitch）
+- `ForceSwitchSelf / ForceSwitchEnemy / ForceSwitchBoth`
+- 技能执行过程中触发，异步等待选精灵
+- 不算死亡计数，和主动切换一样处理
+
+### 精灵血脉属性
+- `Type3` 血脉属性（不参与属性克制计算）
+- `EElfType::Leader` 首领血脉 → 可进化，不可用愿力
+- 愿力冲击 `UAttackSkill_WishStrike`：技能属性 = 血脉属性
 
 ### 敌方 AI（UElfBattleAI）
 - 配置权重：克制攻击 / 增益回能 / 被克制防御 / 被克制换精灵 / 聚能回退
 - 野怪：随机技能 → 聚能
 - 训练家：AI 策略决策
-- 属性克制感知、能量管理
 
 ### 默认技能系统
 - `DefaultSkillIDs`（GameInstance 配置）
-- 默认技能不占装备位，独立存储
 - 聚能（RestoreEnergy）通用回退技能
 
 ### 战斗结束
-- 精灵销毁 + 镜头切回玩家 + 恢复输入模式 + 清理战场
-
-### 摄像与输入
-- 战斗时 `EnterBattleMode` 显示鼠标 + GameAndUI 模式
-- `ExitBattleMode` 隐藏鼠标 + GameOnly 模式
-- 镜头切换到战场后角色原地不动
-
-### Spawner 优化
-- `InitCreatureData` — 完整初始化野怪数据（等级、HP、能量、技能，按 LearnableSkills 自动装备最多 4 个）
-- 胶囊体高度偏移，防止野怪陷地
-- `CreatureData` 标记 `Replicated`，修复客户端数据同步问题
-
-### PvP 修复
-- 服务端传 `PlayerState` 给客户端（而非 Character），解决对手数据拿不到的问题
-- `InitDefaultTeam` 在服务端 `BeginPlay` 调用，`Replicated` 自动同步
-
-### 数据与工具
-- `ElfSkillData.h / DT_ElfSkill` — 技能数据表
-- `GenderDataTable / TypeDataTable` — 性别/系别图片表
-- `GetElfGender / GetElfType` — 枚举值查图函数
-- `SkillDataTable` — GameInstance 数据表引用
+- 清除所有 Buff → 销毁精灵 → 切回玩家 → 自动存档
+- `CaptureItemQuantities` 保留到 `GameInstance`
 
 ### UI 组件
 - UUIManager 通用 UI 开/关
-- UElfUserWidget 基类（WidgetController 注入）
-- UElfPlayerInfo（EInfoSide 标记己方/敌方，显示名称/头像/队伍）
-- UElfBattleHUD（HP 显示、伤害动画）
-- UElfBattleIntro（VS 开场动画 + 精灵选择 + 退出动画）
-- UElfBlueprintFunctionLibrary（快速获取 GameInstance）
+- `UElfBattleHUD` — WidgetSwitcher 面板切换 + `BP_OnInputModeChanged` / `BP_OnBattlePhaseChanged`
+- `UElfBattleInfo` / `UElfBattleSkill` / `UElfBattleSelect`
+- `UElfBattleItem` — 通用道具按钮（索引初始化，自动解析行名）
+- 蓝图子控件：`WBP_BattleItem` / `WBP_BattleElfSwitch` / `WBP_ElfBattleItem`
 
 ## NPC 系统
 - NPCData / ElfMemberData 数据表

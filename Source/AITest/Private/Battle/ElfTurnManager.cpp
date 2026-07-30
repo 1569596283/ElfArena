@@ -29,6 +29,8 @@ void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 		BattleController->OnDefaultSkillSelected.AddDynamic(this, &UElfTurnManager::OnPlayerDefaultSkillSelected);
 		BattleController->OnCaptureConfirmed.Clear();
 		BattleController->OnCaptureConfirmed.AddDynamic(this, &UElfTurnManager::OnCaptureConfirmed);
+		BattleController->OnSwitchSlotSelected.Clear();
+		BattleController->OnSwitchSlotSelected.AddDynamic(this, &UElfTurnManager::OnPlayerSwitchRequest);
 	}
 }
 
@@ -37,6 +39,7 @@ void UElfTurnManager::StartTurn()
 	if (BattleController)
 	{
 		BattleController->ResetBattleItemState();
+		BattleController->SetInputMode(EBattleInputMode::Command);
 	}
 
 	PlayerChosenSlot = -1;
@@ -125,6 +128,9 @@ void UElfTurnManager::OnCaptureConfirmed()
 
 void UElfTurnManager::OnPlayerSwitchRequest(int32 SlotIndex)
 {
+	UE_LOG(LogTemp, Warning, TEXT("OnPlayerSwitchRequest: SlotIndex=%d, CurrentPhase=%d, bInputModeLocked=%d"), 
+		SlotIndex, (int32)CurrentPhase, BattleController ? BattleController->bInputModeLocked : -1);
+
 	if (CurrentPhase != ETurnPhase::ManualSwitch && CurrentPhase != ETurnPhase::PlayerDecision) return;
 
 	if (BuffManager->IsSwitchBlocked(EInfoSide::Self)) return;
@@ -138,13 +144,18 @@ void UElfTurnManager::OnPlayerSwitchRequest(int32 SlotIndex)
 	ChangePhase(ETurnPhase::ManualSwitch);
 	OnSwitchRequested.Broadcast(EInfoSide::Self, SlotIndex);
 
+	PlayerChosenSlot = -1;
+	bLocalActionChosen = true;
+
 	if (BattleModel && BattleModel->BattleType == EBattleType::PvP)
 	{
 		ChangePhase(ETurnPhase::WaitingForOpponent);
 	}
 	else
 	{
-		StartTurn();
+		ChangePhase(ETurnPhase::WaitingForOpponent);
+		ChooseEnemyAction();
+		OnPlayerActionReady();
 	}
 }
 
@@ -284,6 +295,8 @@ void UElfTurnManager::ResolveActions()
 		}
 	}
 
+	bSwiftDone = false;
+
 	ChangePhase(ETurnPhase::SkillExecution);
 
 	if (BattleController)
@@ -302,9 +315,6 @@ void UElfTurnManager::ResolveActions()
 
 void UElfTurnManager::OnExecutionTimer()
 {
-	// 每回合重置 Swift 状态
-	bSwiftDone = false;
-
 	if (ActionQueue.Num() < 2)
 	{
 		EndTurn();

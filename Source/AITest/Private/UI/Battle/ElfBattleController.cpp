@@ -310,8 +310,8 @@ void UElfBattleController::SetInputMode(EBattleInputMode NewMode)
 	{
 		if (PendingSwitchSlot < 0)
 		{
-			PendingSwitchSlot = 0;
-			OnSwitchSlotHighlighted.Broadcast(0);
+			PendingSwitchSlot = 1;
+			OnSwitchSlotHighlighted.Broadcast(1);
 		}
 		else
 		{
@@ -365,12 +365,12 @@ void UElfBattleController::HandleInput(const FGameplayTag& InputTag)
 	}
 	case EBattleInputMode::Switch:
 	{
-		if (InputTag == Tags.Input_Slot1) { PendingSwitchSlot = 0; OnSwitchSlotHighlighted.Broadcast(0); return; }
-		if (InputTag == Tags.Input_Slot2) { PendingSwitchSlot = 1; OnSwitchSlotHighlighted.Broadcast(1); return; }
-		if (InputTag == Tags.Input_Slot3) { PendingSwitchSlot = 2; OnSwitchSlotHighlighted.Broadcast(2); return; }
-		if (InputTag == Tags.Input_Slot4) { PendingSwitchSlot = 3; OnSwitchSlotHighlighted.Broadcast(3); return; }
-		if (InputTag == Tags.Input_Slot5) { PendingSwitchSlot = 4; OnSwitchSlotHighlighted.Broadcast(4); return; }
-		if (InputTag == Tags.Input_Slot6) { PendingSwitchSlot = 5; OnSwitchSlotHighlighted.Broadcast(5); return; }
+		if (InputTag == Tags.Input_Slot1) { PendingSwitchSlot = 1; OnSwitchSlotHighlighted.Broadcast(1); return; }
+		if (InputTag == Tags.Input_Slot2) { PendingSwitchSlot = 2; OnSwitchSlotHighlighted.Broadcast(2); return; }
+		if (InputTag == Tags.Input_Slot3) { PendingSwitchSlot = 3; OnSwitchSlotHighlighted.Broadcast(3); return; }
+		if (InputTag == Tags.Input_Slot4) { PendingSwitchSlot = 4; OnSwitchSlotHighlighted.Broadcast(4); return; }
+		if (InputTag == Tags.Input_Slot5) { PendingSwitchSlot = 5; OnSwitchSlotHighlighted.Broadcast(5); return; }
+		if (InputTag == Tags.Input_Slot6) { PendingSwitchSlot = 6; OnSwitchSlotHighlighted.Broadcast(6); return; }
 		if (InputTag == Tags.Input_Space && PendingSwitchSlot >= 0)
 		{
 			OnSwitchSlotSelected.Broadcast(PendingSwitchSlot);

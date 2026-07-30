@@ -32,7 +32,7 @@ public:
 	void SpawnBattleCreatures();
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
-	void RecallCreature(EInfoSide Side);
+	void RecallCreature(EInfoSide Side, int32 NextSlotIndex = -1, bool bForced = false);
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	AActor* ReleaseCreature(EInfoSide Side, int32 SlotIndex);
@@ -42,6 +42,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void PlaySpawnAnimation(AActor* CreatureActor, float Duration = 0.4f);
+
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void PlayRecallAnimation(AActor* CreatureActor, float Duration = 0.3f);
 
 	UElfBattleController* GetBattleController() const { return BattleController; }
 
@@ -107,6 +110,9 @@ protected:
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> BattleCreatures;
 
+	UPROPERTY()
+	TMap<EInfoSide, TObjectPtr<AActor>> FieldCreatures;
+
 private:
 	struct FScaleAnim
 	{
@@ -117,9 +123,31 @@ private:
 		FVector TargetScale = FVector::OneVector;
 	};
 
+	struct FRecallAnim
+	{
+		TWeakObjectPtr<AActor> Actor;
+		float Elapsed = 0.0f;
+		float Duration = 0.3f;
+	};
+
 	void TickScaleAnimations();
+	void ExecutePendingRelease();
+	void DelayedRelease();
+
+	UPROPERTY()
+	bool bRecallPending = false;
+
+	UPROPERTY()
+	EInfoSide PendingReleaseSide;
+
+	UPROPERTY()
+	int32 PendingReleaseSlot = -1;
+
+	UPROPERTY()
+	bool bPendingReleaseIsForced = false;
 
 	TArray<FScaleAnim> ActiveAnimations;
+	TArray<FRecallAnim> ActiveRecallAnimations;
 
 	FTimerHandle AnimTimerHandle;
 };

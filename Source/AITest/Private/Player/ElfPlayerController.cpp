@@ -44,7 +44,15 @@ void AElfPlayerController::BeginPlay()
 
 	if (HasAuthority())
 	{
-		InitDefaultTeam();
+		UElfSaveGame* Save = Cast<UElfSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("Default"), 0));
+		if (Save)
+		{
+			LoadGame(TEXT("Default"));
+		}
+		else
+		{
+			InitDefaultTeam();
+		}
 	}
 
 	UIManager = NewObject<UUIManager>(this);

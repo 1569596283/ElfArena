@@ -42,6 +42,7 @@ public:
 
 	void OnRemoteActionReceived(int32 SlotIndex);
 
+	UFUNCTION()
 	void OnPlayerSwitchRequest(int32 SlotIndex);
 
 	UFUNCTION(BlueprintPure)
