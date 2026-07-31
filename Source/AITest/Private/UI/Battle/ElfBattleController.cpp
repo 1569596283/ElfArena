@@ -327,6 +327,16 @@ void UElfBattleController::HandleInput(const FGameplayTag& InputTag)
 	UE_LOG(LogTemp, Warning, TEXT("HandleInput: %s"), *InputTag.ToString());
 	const FElfGameplayTags& Tags = FElfGameplayTags::Get();
 
+	// ESC 逃跑（仅玩家决策阶段）
+	if (InputTag == Tags.Input_Escape)
+	{
+		if (CurrentTurnPhase == ETurnPhase::PlayerDecision && !bInputModeLocked)
+		{
+			OnRunRequested.Broadcast();
+		}
+		return;
+	}
+
 	// QWER 仅在玩家决策阶段可用
 	if (CurrentTurnPhase == ETurnPhase::PlayerDecision && !bInputModeLocked)
 	{

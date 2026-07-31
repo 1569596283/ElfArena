@@ -31,6 +31,8 @@ void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 		BattleController->OnCaptureConfirmed.AddDynamic(this, &UElfTurnManager::OnCaptureConfirmed);
 		BattleController->OnSwitchSlotSelected.Clear();
 		BattleController->OnSwitchSlotSelected.AddDynamic(this, &UElfTurnManager::OnPlayerSwitchRequest);
+		BattleController->OnRunRequested.Clear();
+		BattleController->OnRunRequested.AddDynamic(this, &UElfTurnManager::OnPlayerRunRequest);
 	}
 }
 
@@ -159,6 +161,19 @@ void UElfTurnManager::OnPlayerSwitchRequest(int32 SlotIndex)
 	}
 }
 
+void UElfTurnManager::OnPlayerRunRequest()
+{
+	UE_LOG(LogTemp, Warning, TEXT("OnPlayerRunRequest: CurrentPhase=%d"), (int32)CurrentPhase);
+
+	if (CurrentPhase != ETurnPhase::PlayerDecision) return;
+
+	// 野生对战逃跑无惩罚，训练家/玩家对战逃跑视为战败
+	if (BattleModel && BattleModel->BattleType == EBattleType::Wild)
+		EndBattle(EBattleResult::Run);
+	else
+		EndBattle(EBattleResult::PlayerLose);
+}
+
 void UElfTurnManager::ChooseEnemyAction()
 {
 	EnemyChosenSlot = -1;
@@ -285,7 +300,15 @@ void UElfTurnManager::ResolveActions()
 		int32 PlayerSpeed = GetEffectiveSpeed(EInfoSide::Self);
 		int32 EnemySpeed = GetEffectiveSpeed(EInfoSide::Enemy);
 
-		if (PlayerSpeed >= EnemySpeed)
+		if (PlayerSpeed == EnemySpeed)
+		{
+			// 速度相同 → 随机决定先后
+			if (FMath::FRand() < 0.5f)
+				ActionQueue = { PlayerAction, EnemyAction };
+			else
+				ActionQueue = { EnemyAction, PlayerAction };
+		}
+		else if (PlayerSpeed > EnemySpeed)
 		{
 			ActionQueue = { PlayerAction, EnemyAction };
 		}
@@ -296,6 +319,7 @@ void UElfTurnManager::ResolveActions()
 	}
 
 	bSwiftDone = false;
+	bActionSetupDone = false;
 
 	ChangePhase(ETurnPhase::SkillExecution);
 
@@ -309,7 +333,7 @@ void UElfTurnManager::ResolveActions()
 	{
 		World->GetTimerManager().SetTimer(ExecutionTimer,
 			FTimerDelegate::CreateUObject(this, &UElfTurnManager::OnExecutionTimer),
-			3.0f, false);
+			1.0f, false);
 	}
 }
 

@@ -335,34 +335,12 @@ AActor* UElfBattleManager::ReleaseCreature(EInfoSide Side, int32 SlotIndex)
 	{
 		FieldCreatures.Add(Side, Spawned);
 
-		// 广播精灵入场提示（入场动画前）
+		// 广播精灵入场提示（入场动画前；首次入场时 UI 尚未创建，切换入场时能收到）
 		if (BattleController)
 		{
 			FElfCreatureInstance* CreatureData = SideData->GetActiveCreature();
 			if (CreatureData)
-			{
 				BattleController->OnCreatureSummoned.Broadcast(Side, CreatureData->CreatureRowName);
-
-				// 延迟广播特性提示（入场动画完成后）
-				FName AbilityID = NAME_None;
-				UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-				if (GI)
-				{
-					FElfBaseData BaseData;
-					if (GI->GetElfBaseData(CreatureData->CreatureRowName, BaseData))
-						AbilityID = BaseData.AbilityID;
-				}
-				if (!AbilityID.IsNone())
-				{
-					FTimerHandle TempHandle;
-					GetWorld()->GetTimerManager().SetTimer(TempHandle,
-						FTimerDelegate::CreateWeakLambda(this, [this, Side, AbilityID]()
-						{
-							if (BattleController)
-								BattleController->OnCreatureAbility.Broadcast(Side, AbilityID);
-						}), 0.4f, false);
-				}
-			}
 		}
 
 		PlaySpawnAnimation(Spawned, 0.4f);
@@ -435,6 +413,11 @@ void UElfBattleManager::SpawnBattleCreatures()
 		if (Spawned)
 		{
 			FieldCreatures.Add(EInfoSide::Enemy, Spawned);
+			if (BattleController)
+			{
+				const FElfCreatureInstance& EnemyData = Model->EnemySide.Team[Model->EnemySide.ActiveIndex];
+				BattleController->OnCreatureSummoned.Broadcast(EInfoSide::Enemy, EnemyData.CreatureRowName);
+			}
 		}
 	}
 }

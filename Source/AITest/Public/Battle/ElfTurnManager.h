@@ -45,6 +45,9 @@ public:
 	UFUNCTION()
 	void OnPlayerSwitchRequest(int32 SlotIndex);
 
+	UFUNCTION()
+	void OnPlayerRunRequest();
+
 	UFUNCTION(BlueprintPure)
 	ETurnPhase GetCurrentPhase() const { return CurrentPhase; }
 

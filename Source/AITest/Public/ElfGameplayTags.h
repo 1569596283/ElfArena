@@ -23,6 +23,7 @@ public:
 	FGameplayTag Input_W;
 	FGameplayTag Input_E;
 	FGameplayTag Input_R;
+	FGameplayTag Input_Escape;
 
 private:
     static FElfGameplayTags GameplayTags;

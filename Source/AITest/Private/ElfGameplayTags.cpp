@@ -22,4 +22,5 @@ void FElfGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Input_W = Manager.AddNativeGameplayTag(FName("Input.W"));
 	GameplayTags.Input_E = Manager.AddNativeGameplayTag(FName("Input.E"));
 	GameplayTags.Input_R = Manager.AddNativeGameplayTag(FName("Input.R"));
+	GameplayTags.Input_Escape = Manager.AddNativeGameplayTag(FName("Input.Escape"));
 }

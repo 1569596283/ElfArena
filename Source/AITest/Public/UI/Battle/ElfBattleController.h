@@ -29,6 +29,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattleItemClicked, FName, ItemRow
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattlePhaseChanged, ETurnPhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPendingSlotChanged, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCaptureConfirmed);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRunRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnSkillDisplay, EInfoSide, Side, FName, SkillRowName, bool, bIsCounter);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDisplaySequenceDone);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCreatureSummoned, EInfoSide, Side, FName, CreatureRowName);
@@ -48,6 +49,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
 	EBattleInputMode GetInputMode() const { return CurrentInputMode; }
+
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void RequestRun() { OnRunRequested.Broadcast(); }
 
 	void BroadcastHP();
 
@@ -274,6 +278,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnCaptureConfirmed OnCaptureConfirmed;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnRunRequested OnRunRequested;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnSkillDisplay OnSkillDisplayStarted;
