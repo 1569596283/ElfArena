@@ -11,12 +11,15 @@
 - USaveGame 结构（精灵队伍、仓库、位置、世界缓存等）
 - PlayerController 上的 SaveGame/LoadGame 函数
 - 多存档位支持
+- BeginPlay 先检查存档 → 有则 LoadGame，无则 InitDefaultTeam（修复重进丢精灵）
+- 战斗结束自动 SaveGame（捕捉的精灵可持久化）
 
 ## 精灵数据
 - DataTable 种族数据（FElfBaseData）
 - 个体实例数据（FElfCreatureInstance）
 - UDataManager（UGameInstanceSubsystem，缓存野生精灵）
 - PlayerState 管理队伍（0~6）和仓库，支持多人复制
+- 已知限制：属性计算目前只取种族值，等级/个体值/努力值/性格修正未参与（待实现）
 
 ## 精灵基类
 - ElfCharacterBase（基础数据引用）
@@ -95,6 +98,34 @@
 - `ElfBattleSkill` — 技能控件（4 槽位），绑定能量变化自动刷新
 - `OnCreatureSwitched` — 切换精灵事件
 - `GetCurrentStats` — 快捷获取当前 HP/MaxHP/能量
+- `ElfBattleInfo` 自动绑定 HP/能量/换精灵事件，新精灵上场自动刷新
+
+### 提示 UI
+- `WBP_BattleTips` — 局内提示：左己方/右敌方，VerticalBox 堆叠
+- 新提示出现在下方，退场时 SizeBox HeightOverride lerp 到 0，下方提示自动上移
+- 单条提示计时后自动消失
+
+### 逐行动作执行 + 技能展示
+- `OnExecutionTimer` 重构为逐行动作 + 定时器链（显示 1.5s / 结算 1s）
+- 应对情况：显示顺序 [被应对→应对]，结算顺序 [应对→被应对]
+- 事件：`OnSkillDisplayStarted(Side, SkillRowName, bIsCounter)`
+- 事件：`OnCreatureSummoned(Side, CreatureRowName)`（切换入场时，入场动画前）
+- 事件：`OnCreatureAbility(Side, AbilityID)`（预留，特性触发时广播）
+- 事件：`OnAllSkillsDisplayed`
+- 修复 `bSwiftDone` / `bActionSetupDone` 定时器状态导致的多回合卡死
+
+### 切换精灵（完整）
+- Switch 模式按键 `Slot_N → Index = N`（跳过当前在场精灵索引0）
+- `OnSwitchSlotSelected` → `OnPlayerSwitchRequest` 绑定（`UFUNCTION` 缺失已修复）
+- 切换作为本回合行动：WaitingForOpponent → 敌人行动 → SkillExecution
+- `StartTurn` 复位输入模式到 Command
+- 退场动画（1→0 缩放，0.3s）→ 0.5s 间隔 → 入场动画（0→1）
+
+### 逃跑（ESC）
+- 仅玩家操作回合（PlayerDecision）可用
+- 野生 → `EndBattle(Run)`，训练家/PvP → `EndBattle(PlayerLose)`
+- 按钮入口：`UElfBattleController::RequestRun()`
+- 配置：`IA_Escape` + `IMC_Battle` ESC 映射 + `DA_InputConfig` Tag `Input.Escape`
 
 ### 技能系统
 - `FSkillData` — 技能数据表结构（名称/类型/系别/效果列表/先制度/能量消耗/技能类）
@@ -112,7 +143,7 @@
 
 ### 回合制战斗（UElfTurnManager）
 - **回合状态机**：`BattleStart → SelectCreature → PlayerDecision → WaitingForOpponent → CapturePhase → EvolutionPhase → ForcedSwitch → SkillExecution → TurnEnd`
-- **行动排序**：按先制度 → 速度 → 随机
+- **行动排序**：按先制度 → 速度（相同则随机）
 - **应对系统（Counter）**：攻击→状态 增伤，防御→攻击 减伤，状态→防御 增益，通过 `CounterEffects` 配置
 - 技能执行管线：扣能量（Buff修正）→ 标记使用 → 应用伤害+效果 → 死亡判定 → 离场检测
 - Swift 技能执行：上场时自动释放，按速度排序

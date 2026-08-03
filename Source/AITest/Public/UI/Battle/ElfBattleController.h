@@ -6,10 +6,12 @@
 #include "ElfEnum.h"
 #include "UI/Battle/ElfPlayerInfo.h"
 #include "Data/ElfSkillData.h"
+#include "Battle/ElfTurnManager.h"
 #include "ElfBattleController.generated.h"
 
 class UElfBattleModel;
 class UUserWidget;
+class UElfTurnManager;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnIntroComplete);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCameraRequested);
@@ -43,6 +45,10 @@ class AITEST_API UElfBattleController : public UObject
 public:
 	void Init(APlayerController* InOwner, EBattleType Type, AActor* Opponent);
 	void HandleInput(const FGameplayTag& InputTag);
+
+	// 连接回合管理器（道具/捕捉状态机在 TurnManager 上）
+	void SetTurnManager(UElfTurnManager* InTurnManager);
+	UElfTurnManager* GetTurnManager() const { return TurnManager; }
 
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void SetInputMode(EBattleInputMode NewMode);
@@ -101,16 +107,16 @@ public:
 	bool IsItemCompatibleWithCreature(FName ItemRowName) const;
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
-	bool IsBattleItemUsedThisTurn() const { return bItemUsedThisTurn; }
+	bool IsBattleItemUsedThisTurn() const { return TurnManager ? TurnManager->IsBattleItemUsedThisTurn() : false; }
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
-	bool IsCapturePending() const { return bCapturePending; }
+	bool IsCapturePending() const { return TurnManager ? TurnManager->IsCapturePending() : false; }
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
-	float GetCaptureBallRate() const { return PendingCaptureBallRate; }
+	float GetCaptureBallRate() const { return TurnManager ? TurnManager->GetCaptureBallRate() : 0.0f; }
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
-	int32 GetCaptureItemQuantity(FName ItemRowName) const { return CaptureItemQuantities.FindRef(ItemRowName); }
+	int32 GetCaptureItemQuantity(FName ItemRowName) const { return TurnManager ? TurnManager->GetCaptureItemQuantity(ItemRowName) : 0; }
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
 	int32 GetPendingSwitchSlot() const { return PendingSwitchSlot; }
@@ -120,7 +126,7 @@ public:
 
 	void InitCaptureItemQuantities();
 
-	void ClearCapturePending() { bCapturePending = false; PendingCaptureBallRate = 0.0f; }
+	void ClearCapturePending();
 
 	void UseBattleItem();
 
@@ -155,7 +161,7 @@ public:
 
 	void RefundItem(FName ItemRowName);
 
-	void ResetBattleItemState() { bItemUsedThisTurn = false; PendingItemRowName = NAME_None; bCapturePending = false; PendingCaptureBallRate = 0.0f; }
+	void ResetBattleItemState();
 
 	void ConsumePendingItem();
 
@@ -332,30 +338,8 @@ protected:
 	TObjectPtr<UElfBattleModel> BattleModel;
 
 	UPROPERTY()
+	TObjectPtr<UElfTurnManager> TurnManager;
+
+	UPROPERTY()
 	EBattleInputMode CurrentInputMode = EBattleInputMode::Command;
-
-	UPROPERTY()
-	TMap<FName, int32> ItemRemainingUses;
-
-	UPROPERTY()
-	bool bItemUsedThisTurn = false;
-
-	UPROPERTY()
-	FName PendingItemRowName;
-
-	UPROPERTY()
-	bool bCapturePending = false;
-
-	UPROPERTY()
-	float PendingCaptureBallRate = 0.0f;
-
-	UPROPERTY()
-	TMap<FName, int32> CaptureItemQuantities;
-
-	TArray<FName> CachedCaptureItemList;
-	TArray<FName> CachedBattleItemList;
-	int32 LastBattleItemActiveIndex = -1;
-
-	FName CachedWishRowName;
-	FName CachedEvoRowName;
 };

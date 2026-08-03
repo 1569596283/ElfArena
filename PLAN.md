@@ -297,13 +297,60 @@
 ### 7.7 特性（Ability）
 
 - 每个精灵拥有一个特性
-- 特性是一种被动效果，在**各种时机**可能触发：
-  - 进入战斗时
-  - 回合开始时/结束时
-  - 释放技能时/受到伤害时
-  - 死亡时
-  - 其他自定义时机
-- 特性效果多种多样（增伤、减伤、回复、改变属性等）
+- 特性是一种被动效果，在**各种时机**可能触发
+- 特性效果多种多样（增伤、减伤、回复、改变属性等），复用 `FSkillEffect` / `FEffectData` 风格
+
+#### 数据表结构（设计决策已确认）
+
+- **`DT_Ability`（`FAbilityData`）**：特性定义表
+- 触发时机用 `EAbilityTrigger` 枚举表达
+- 效果复用 `FSkillEffect` / `FEffectData` 风格
+
+#### 效果实现方式（设计决策已确认）
+
+- **混合模式（与技能系统一致）**：
+  - `FAbilityData` 内含 `AbilityClass`（`TSubclassOf<UElfAbilityBase>`），默认基类
+  - `UElfAbilityBase`（UObject 抽象基类）：`TriggerAbility()` 虚函数，默认遍历 `Effects` 走通用效果
+  - 通用效果复用 `FSkillEffect` / 现有 BuffManager 接口（增伤/减伤/回复/加Buff等）
+  - **特殊特性才新建 C++ 子类**重写 `TriggerAbility()` / `CanTrigger()`（如现有 EffectID 表达不了的逻辑）
+  - 实例化方式与技能一致：`NewObject<UElfAbilityBase>(Outer, AbilityClass)`
+
+#### 效果落地规则（设计决策已确认）
+
+- **一次性效果**：触发时立刻执行 `Effects` 列表（`HealHPPercent` 回血 / `RestoreEnergy` 回能 / `AddBuff`、`AddDebuff` 施加增益），基类默认实现与 `ApplyStatusEffects` 逻辑一致
+- **常驻效果**（"在场上就生效"）：本质 = 施放 **`Duration=-1 + bPersistent` 的 Buff**（指向 `DT_BuffDef`），统一走 `Effects` 列表里的 `AddBuff`，无需区分形态
+- **属性增减**（攻击/防御/速度等）：走 Buff 属性修正（`EElfBuffStat` + `StatModPercent` / `ModifyFlat`）
+- **直接伤害增减**（伤害+50% / 受到伤害-30%）：不走属性，走**独立乘区**——新增伤害计算钩子，在伤害公式处额外乘算
+
+#### 实例生命周期（设计决策已确认）
+
+- **战斗时创建**：进入战斗时按精灵实例化，存 `BattleModel`，战斗结束销毁
+- 大世界状态不持有特性实例
+
+#### 触发条件（设计决策已确认）
+
+- 数值字段（概率 / 血量阈值等）**配置在 `FAbilityData` 数据表内**
+- 每个字段带**中文说明（ToolTip）**，说明字段内容本身也可配置
+- 基类 `CanTrigger()` 统一读取并判断
+
+#### 触发时机清单（`EAbilityTrigger` 枚举候选）
+
+| 触发时机 | 说明 | 备注 |
+|----------|------|------|
+| 造成克制伤害后 | 造成克制伤害时 | 每次技能释放判断，**连击只算一次** |
+| 使用某种属性的技能后 | 使用指定属性技能时 | 属性由配置指定 |
+| 精灵在场上就生效 | 常驻被动 | 上场持续生效，非一次性 |
+| 先手攻击时 | 本回合先手出手时 | |
+| 回合结束 | 回合结束阶段 | |
+| 受到攻击伤害时 | 受到伤害时 | **连击时多次计算** |
+| 在场下时 | 精灵在队伍中未上场时 | 非上场状态生效 |
+| 精灵死亡时 | 自身死亡时 | |
+| 敌方精灵离场后 | 敌方精灵被击倒/离场后 | |
+| 回复能量时 | 能量恢复时 | |
+| 己方离场时 | 己方精灵离场/收回时 | |
+| 己方有某种增益时 | 己方持有指定增益时 | 增益由配置指定 |
+| 对方有某种减益或增益时 | 对方持有指定减益/增益时 | 由配置指定 |
+| …（可扩展） | 其他自定义时机 | |
 
 ### 7.8 最终属性计算
 
@@ -408,11 +455,20 @@ Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, V
 | `TurnEndDamage` | 最大生命比例(0.03=3%) | 回合结束伤害 | 回合结束 |
 | `EnterDrainEnergy` | 扣除量 | 上场扣能 | 上场时 |
 
+#### 直接伤害乘区（独立乘区）
+
+- **`DirectDamageGain`**（直接伤害增益）：`GainCondition`=条件类型, `Value`=每单位增益倍率(0.1=+10%)
+- **`DirectDamageReduce`**（直接伤害减免）：`GainCondition`=条件类型, `Value`=每单位减免倍率(0.1=-10%)
+- **计算方式**：所有直接伤害增益倍率相乘 × 所有直接伤害减免倍率相乘（每项 `(1 ± Value×单位数×层数)`）
+- **条件类型**（`EDirectGainCondition`）：无条件 / 对方增益数量 / 己方增益数量
+- **钩子点**：伤害计算（威力乘区之后、属性克制之前）
+- 典型用法："对方每有一个增益效果，伤害增加10%" → `GainCondition=对方增益数量, Value=0.1`
+
 #### 增益/减益效果
 
 | EffectID | 参数 | 说明 |
 |----------|------|------|
-| `StatModPercent` | TargetStat=属性, Value=百分比(0.1=+10%) | 属性百分比修正 |
+| `StatModPercent` | TargetStat=属性, Value=百分比整数(10=+10%, -60=-60%) | 属性百分比修正 |
 | `ModifyFlat` | TargetStat=属性, Value=数值 | 属性固定值修正 |
 | `ModifySpeed` | Value=速度变化 | 速度修正 |
 | `ModifyEnergyCost` | Value=能耗变化 | 能耗修正 |
@@ -421,6 +477,12 @@ Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, V
 | `FreezeHP` | Value=冻结比例(0.05=5%) | 冻结生命 |
 | `TurnEndElementDamage` | Value=最大生命比例, SecondaryValue=元素类型int | 回合结束属性伤害 |
 | `BlockSwitch` | 无参数 | 禁止替换 |
+
+**`StatModPercent` 计算规则**（Value 填整数百分比，代码自动 /100，层数叠加）：
+- 最终百分比 `Percent = (Value/100) × StackCount`（如 `-10 × 6 → -0.6`）
+- **增益**（Percent ≥ 0）：`属性 × (1 + Percent)`（如 +40% → ×1.4）
+- **减益**（Percent < 0）：`属性 × 100 / (100 + |Percent|×100)`（如 -60% → ×100/160 ≈ ×0.625）
+- **净额抵消**：同一属性的增益/减益按总百分比互相抵消（威吓 -60% + 剑舞 +100% → +40%）
 
 ### 10.4 管理类
 
@@ -607,4 +669,18 @@ PlayerDecision（下一回合）
 - `Def` 后缀不再使用
 - 类型枚举值通过 `EffectID` 识别，不依赖行名
 
-## 17. 待补充…
+## 17. 职责拆分（待办，特性完成后处理）
+
+**目标**：`UElfBattleController` 当前职责混杂（UI 数据查询 / UI 事件总线 / 输入路由 / 道具捕捉状态机），需分层。
+
+**第 1 步（进行中）**：道具/捕捉状态机迁到 `UElfTurnManager`
+- 迁移状态：`ItemRemainingUses`、`bItemUsedThisTurn`、`PendingItemRowName`、`bCapturePending`、`PendingCaptureBallRate`、`CaptureItemQuantities`
+- 迁移逻辑：`UseItem`、`UseCaptureItem`、`UseBattleItem`、`ConsumePendingItem`、`CancelWish`、`RefundItem`、`ResetBattleItemState`、`FindBattleItemRowName`、`CanUseBattleItem`、`GetItemRemainingUses`、`IsItemCompatibleWithCreature`、`InitCaptureItemQuantities`、`ClearCapturePending`、`IsCapturePending`、`GetCaptureBallRate`、`GetCaptureItemQuantity`
+- `BattleController` 保留薄转发接口（含 Blueprint 标记，避免断蓝图引用），内部调用 TurnManager
+
+**第 2 步（后续）**：拆分 Controller 的查询/事件/输入职责
+- UI 数据查询（GetXxx）与事件总线保留在 Controller（薄层）
+- 输入路由 `HandleInput` 可独立或保留
+- 明确 Controller 不再持有战斗规则状态
+
+## 18. 待补充…

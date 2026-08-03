@@ -1,5 +1,6 @@
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
+#include "Battle/ElfTurnManager.h"
 #include "Data/ElfSkillData.h"
 #include "Data/ElfItemData.h"
 #include "Data/ElfBaseData.h"
@@ -13,10 +14,26 @@
 
 void UElfBattleController::InitCaptureItemQuantities()
 {
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return;
+	if (TurnManager)
+		TurnManager->InitCaptureItemQuantities();
+}
 
-	CaptureItemQuantities = GI->CaptureItemQuantities;
+void UElfBattleController::SetTurnManager(UElfTurnManager* InTurnManager)
+{
+	TurnManager = InTurnManager;
+	InitCaptureItemQuantities();
+}
+
+void UElfBattleController::ClearCapturePending()
+{
+	if (TurnManager)
+		TurnManager->ClearCapturePending();
+}
+
+void UElfBattleController::ResetBattleItemState()
+{
+	if (TurnManager)
+		TurnManager->ResetBattleItemState();
 }
 
 void UElfBattleController::Init(APlayerController* InOwner, EBattleType Type, AActor* Opponent)
@@ -24,7 +41,6 @@ void UElfBattleController::Init(APlayerController* InOwner, EBattleType Type, AA
 	OwnerPC = InOwner;
 	BattleModel = NewObject<UElfBattleModel>(this);
 	BattleModel->Init(InOwner, Type, Opponent);
-	InitCaptureItemQuantities();
 	BroadcastHP();
 }
 
@@ -435,394 +451,94 @@ void UElfBattleController::UseDefaultSkill(int32 SlotIndex)
 
 int32 UElfBattleController::GetBattleItemCount()
 {
-	return GetBattleItemList().Num();
+	return TurnManager ? TurnManager->GetBattleItemCount() : 0;
 }
 
 FName UElfBattleController::GetBattleItemAtSlot(int32 FlatIndex)
 {
-	return GetBattleItemList().IsValidIndex(FlatIndex) ? GetBattleItemList()[FlatIndex] : NAME_None;
+	return TurnManager ? TurnManager->GetBattleItemAtSlot(FlatIndex) : NAME_None;
 }
 
 const TArray<FName>& UElfBattleController::GetBattleItemList()
 {
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI || !GI->ItemDataTable) return CachedBattleItemList;
-
-	// 检查精灵是否变更
-	int32 CurrentActive = BattleModel ? BattleModel->PlayerSide.ActiveIndex : -1;
-	if (CurrentActive == LastBattleItemActiveIndex && !CachedBattleItemList.IsEmpty())
-		return CachedBattleItemList;
-
-	LastBattleItemActiveIndex = CurrentActive;
-	CachedBattleItemList.Empty();
-
-	static const FString Context(TEXT("BuildBattleItemList"));
-	for (const FName& RowName : GI->ItemDataTable->GetRowNames())
-	{
-		const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
-		if (Item && Item->ItemType == EItemType::Battle && IsItemCompatibleWithCreature(RowName))
-			CachedBattleItemList.Add(RowName);
-	}
-	return CachedBattleItemList;
+	static TArray<FName> Empty;
+	return TurnManager ? TurnManager->GetBattleItemList() : Empty;
 }
 
 FName UElfBattleController::GetBattleItemRowName()
 {
-	FName WishRow = FindBattleItemRowName(EEffectID::WishSkill);
-	FName EvoRow = FindBattleItemRowName(EEffectID::Evolution);
-
-	if (IsItemCompatibleWithCreature(WishRow))
-		return WishRow;
-	if (IsItemCompatibleWithCreature(EvoRow))
-		return EvoRow;
-	return NAME_None;
+	return TurnManager ? TurnManager->GetBattleItemRowName() : NAME_None;
 }
 
 void UElfBattleController::UseBattleItem()
 {
-	FName WishRow = FindBattleItemRowName(EEffectID::WishSkill);
-	FName EvoRow = FindBattleItemRowName(EEffectID::Evolution);
-	FName ItemToUse = (!WishRow.IsNone() && IsItemCompatibleWithCreature(WishRow)) ? WishRow : EvoRow;
-	if (!ItemToUse.IsNone())
-	{
-		UseItem(ItemToUse);
-		OnBattleItemClicked.Broadcast(ItemToUse);
-	}
+	if (TurnManager)
+		TurnManager->UseBattleItem();
 }
 
 void UElfBattleController::UseCaptureItem(int32 FlatIndex)
 {
-	const TArray<FName>& List = GetCaptureItemList();
-	UE_LOG(LogTemp, Warning, TEXT("UseCaptureItem: FlatIndex=%d, List.Num=%d"), FlatIndex, List.Num());
-	if (!List.IsValidIndex(FlatIndex)) { UE_LOG(LogTemp, Warning, TEXT("→ Invalid index")); return; }
-
-	FName RowName = List[FlatIndex];
-	UE_LOG(LogTemp, Warning, TEXT("→ RowName=%s, List[0]=%s, List[1]=%s, List[2]=%s"), *RowName.ToString(),
-		List.IsValidIndex(0) ? *List[0].ToString() : TEXT("?"),
-		List.IsValidIndex(1) ? *List[1].ToString() : TEXT("?"),
-		List.IsValidIndex(2) ? *List[2].ToString() : TEXT("?"));
-	UE_LOG(LogTemp, Warning, TEXT("→ CaptureItemQuantities keys:"));
-	for (const auto& Pair : CaptureItemQuantities)
-		UE_LOG(LogTemp, Warning, TEXT("    %s = %d"), *Pair.Key.ToString(), Pair.Value);
-	int32* Qty = CaptureItemQuantities.Find(RowName);
-	if (!Qty) { UE_LOG(LogTemp, Warning, TEXT("→ Not found in quantities")); return; }
-	if (*Qty <= 0) { UE_LOG(LogTemp, Warning, TEXT("→ Quantity is 0")); return; }
-
-	(*Qty)--;
-	if (UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr)
-	{
-		if (int32* GIQty = GI->CaptureItemQuantities.Find(RowName))
-			(*GIQty)--;
-	}
-	bCapturePending = true;
-	PendingCaptureBallRate = 0.0f;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	FItemData ItemData;
-	if (GI && GI->GetItemData(RowName, ItemData) && ItemData.Params.IsValidIndex(0))
-		PendingCaptureBallRate = ItemData.Params[0];
-
-	bItemUsedThisTurn = true;
-	OnCaptureConfirmed.Broadcast();
+	if (TurnManager)
+		TurnManager->UseCaptureItem(FlatIndex);
 }
 
 int32 UElfBattleController::GetCaptureItemCount()
 {
-	return GetCaptureItemList().Num();
+	return TurnManager ? TurnManager->GetCaptureItemCount() : 0;
 }
 
 FName UElfBattleController::GetCaptureItemAtSlot(int32 FlatIndex)
 {
-	GetCaptureItemList(); // 确保列表已构建
-	return CachedCaptureItemList.IsValidIndex(FlatIndex) ? CachedCaptureItemList[FlatIndex] : NAME_None;
+	return TurnManager ? TurnManager->GetCaptureItemAtSlot(FlatIndex) : NAME_None;
 }
 
 const TArray<FName>& UElfBattleController::GetCaptureItemList()
 {
-	if (CachedCaptureItemList.IsEmpty())
-	{
-		CachedCaptureItemList.Empty();
-		UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-		if (GI && GI->ItemDataTable)
-		{
-			static const FString Context(TEXT("BuildCaptureList"));
-			for (const FName& RowName : GI->ItemDataTable->GetRowNames())
-			{
-				const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
-				if (Item && Item->ItemType == EItemType::Capture)
-					CachedCaptureItemList.Add(RowName);
-			}
-		}
-	}
-	return CachedCaptureItemList;
+	static TArray<FName> Empty;
+	return TurnManager ? TurnManager->GetCaptureItemList() : Empty;
 }
 
 bool UElfBattleController::UseItem(FName ItemRowName)
 {
-	if (ItemRowName.IsNone()) return false;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return false;
-
-	FItemData ItemDef;
-	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
-
-	if (ItemDef.ItemType != EItemType::Battle) return false;
-
-	// 重复点击 → 取消
-	if (PendingItemRowName == ItemRowName)
-	{
-		if (ItemDef.EffectID == EEffectID::WishSkill)
-			CancelWish();
-		else
-		{
-			FElfCreatureInstance* Creature = BattleModel ? BattleModel->PlayerSide.GetActiveCreature() : nullptr;
-			if (Creature) Creature->bPendingEvolution = false;
-			PendingItemRowName = NAME_None;
-			bItemUsedThisTurn = false;
-		}
-		return true;
-	}
-
-	int32* Remain = ItemRemainingUses.Find(ItemRowName);
-	int32 UsesLeft = Remain ? *Remain : ItemDef.MaxBattleUses;
-	if (UsesLeft <= 0) return false;
-
-	FElfCreatureInstance* Creature = BattleModel ? BattleModel->PlayerSide.GetActiveCreature() : nullptr;
-	if (!Creature) return false;
-
-	switch (ItemDef.EffectID)
-	{
-	case EEffectID::Evolution:
-	{
-		FElfBaseData BaseData;
-		if (GI->GetElfBaseData(Creature->CreatureRowName, BaseData) && BaseData.Type3 == EElfType::Leader && !BaseData.EvolutionTarget.RowName.IsNone())
-		{
-			Creature->bPendingEvolution = true;
-		}
-		break;
-	}
-	case EEffectID::WishSkill:
-	{
-		if (!ItemDef.TargetRowName.IsNone())
-		{
-			FElfBaseData BaseData;
-			bool bHasBaseData = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
-			if (bHasBaseData && BaseData.Type3 == EElfType::Leader) break;
-
-			EElfType BloodlineType = bHasBaseData ? BaseData.Type3 : EElfType::Normal;
-			int32 ActiveIdx = BattleModel->PlayerSide.ActiveIndex;
-
-			// 存档原技能0，替换为愿力冲击
-			Creature->BackupFirstSkill = Creature->EquippedSkills.IsValidIndex(0) ? Creature->EquippedSkills[0] : FName();
-			Creature->EquippedSkills[0] = ItemDef.TargetRowName;
-			Creature->bWishActive = true;
-
-			// 创建愿力冲击技能实例
-			FSkillData SkillData;
-			if (GI->GetSkillData(ItemDef.TargetRowName, SkillData) && SkillData.SkillClass)
-			{
-				SkillData.ElementType = BloodlineType;
-				UElfSkillBase* Instance = NewObject<UElfSkillBase>(BattleModel, SkillData.SkillClass);
-				Instance->Init(SkillData);
-
-				if (BattleModel->PlayerSide.SkillInstances.IsValidIndex(ActiveIdx))
-				{
-					if (BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.IsValidIndex(0))
-						BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances[0] = Instance;
-					else
-						BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.Insert(Instance, 0);
-				}
-			}
-		}
-		break;
-	}
-	default:
-		return false;
-	}
-
-	bItemUsedThisTurn = true;
-	PendingItemRowName = ItemRowName;
-
-	return true;
+	return TurnManager ? TurnManager->UseItem(ItemRowName) : false;
 }
 
 bool UElfBattleController::CanUseBattleItem(FName ItemRowName) const
 {
-	if (bItemUsedThisTurn) return false;
-
-	if (!BattleModel) return false;
-	const FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
-	if (!Creature) return false;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return false;
-
-	FItemData ItemDef;
-	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
-
-	FElfBaseData BaseData;
-	bool bHasBase = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
-	if (ItemDef.EffectID == EEffectID::WishSkill)
-	{
-		if (!bHasBase || BaseData.Type3 == EElfType::Leader) return false;
-	}
-	else if (ItemDef.EffectID == EEffectID::Evolution)
-	{
-		if (!bHasBase || BaseData.Type3 != EElfType::Leader) return false;
-	}
-
-	return true;
+	return TurnManager ? TurnManager->CanUseBattleItem(ItemRowName) : false;
 }
 
 int32 UElfBattleController::GetItemRemainingUses(FName ItemRowName) const
 {
-	// 初始化：从数据表读取最大使用次数
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-
-	if (GI)
-	{
-		FItemData ItemData;
-		if (GI->GetItemData(ItemRowName, ItemData) && !ItemRemainingUses.Contains(ItemRowName))
-		{
-			const_cast<UElfBattleController*>(this)->ItemRemainingUses.Add(ItemRowName, ItemData.MaxBattleUses);
-		}
-	}
-
-	// 检查是否有其他战斗道具已被使用（每局只能用一个）
-	if (GI && GI->ItemDataTable)
-	{
-		static const FString Context(TEXT("GetBattleItemUses"));
-		TArray<FName> RowNames = GI->ItemDataTable->GetRowNames();
-		for (const FName& Other : RowNames)
-		{
-			if (Other == ItemRowName) continue;
-			const FItemData* OtherData = GI->ItemDataTable->FindRow<FItemData>(Other, Context);
-			if (OtherData && OtherData->ItemType == EItemType::Battle)
-			{
-				const int32* Remain = ItemRemainingUses.Find(Other);
-				if (Remain && *Remain < OtherData->MaxBattleUses)
-					return 0;
-			}
-		}
-	}
-
-	const int32* Remain = ItemRemainingUses.Find(ItemRowName);
-	return Remain ? *Remain : 0;
+	return TurnManager ? TurnManager->GetItemRemainingUses(ItemRowName) : 0;
 }
 
 bool UElfBattleController::IsItemCompatibleWithCreature(FName ItemRowName) const
 {
-	if (!BattleModel) return false;
-	const FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
-	if (!Creature) return false;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return false;
-
-	FItemData ItemDef;
-	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
-
-	FElfBaseData BaseData;
-	bool bHasBase = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
-	if (!bHasBase) return false;
-
-	if (ItemDef.EffectID == EEffectID::WishSkill)
-		return BaseData.Type3 != EElfType::Leader;
-	if (ItemDef.EffectID == EEffectID::Evolution)
-		return BaseData.Type3 == EElfType::Leader;
-
-	return false;
+	return TurnManager ? TurnManager->IsItemCompatibleWithCreature(ItemRowName) : false;
 }
 
 FName UElfBattleController::FindBattleItemRowName(EEffectID EffectID)
 {
-	// 缓存已查到的行名
-	if (EffectID == EEffectID::WishSkill && !CachedWishRowName.IsNone())
-		return CachedWishRowName;
-	if (EffectID == EEffectID::Evolution && !CachedEvoRowName.IsNone())
-		return CachedEvoRowName;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI || !GI->ItemDataTable) return NAME_None;
-
-	static const FString Context(TEXT("FindBattleItem"));
-	TArray<FName> RowNames = GI->ItemDataTable->GetRowNames();
-	for (const FName& RowName : RowNames)
-	{
-		const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
-		if (Item && Item->ItemType == EItemType::Battle && Item->EffectID == EffectID)
-		{
-			if (EffectID == EEffectID::WishSkill) CachedWishRowName = RowName;
-			if (EffectID == EEffectID::Evolution) CachedEvoRowName = RowName;
-			return RowName;
-		}
-	}
-	return NAME_None;
+	return TurnManager ? TurnManager->FindBattleItemRowName(EffectID) : NAME_None;
 }
 
 void UElfBattleController::ConsumePendingItem()
 {
-	if (PendingItemRowName.IsNone()) return;
-
-	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return;
-
-	FItemData ItemData;
-	if (!GI->GetItemData(PendingItemRowName, ItemData)) return;
-
-	int32* Remain = ItemRemainingUses.Find(PendingItemRowName);
-	int32 Uses = Remain ? *Remain : ItemData.MaxBattleUses;
-	if (Uses <= 0) return;
-
-	Uses--;
-	ItemRemainingUses.Add(PendingItemRowName, Uses);
-	OnItemUsed.Broadcast(PendingItemRowName, Uses);
-
-	PendingItemRowName = NAME_None;
+	if (TurnManager)
+		TurnManager->ConsumePendingItem();
 }
 
 void UElfBattleController::CancelWish()
 {
-	if (!BattleModel) return;
-	FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
-	if (!Creature || !Creature->bWishActive) return;
-
-	// 恢复原技能
-	Creature->EquippedSkills[0] = Creature->BackupFirstSkill;
-	Creature->bWishActive = false;
-
-	// 重新创建技能0的实例
-	int32 ActiveIdx = BattleModel->PlayerSide.ActiveIndex;
-	if (BattleModel->PlayerSide.SkillInstances.IsValidIndex(ActiveIdx))
-	{
-		if (!Creature->BackupFirstSkill.IsNone())
-		{
-			UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-			FSkillData SkillData;
-			if (GI && GI->GetSkillData(Creature->BackupFirstSkill, SkillData) && SkillData.SkillClass)
-			{
-				UElfSkillBase* Instance = NewObject<UElfSkillBase>(BattleModel, SkillData.SkillClass);
-				Instance->Init(SkillData);
-				if (BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.IsValidIndex(0))
-					BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances[0] = Instance;
-			}
-		}
-	}
-
-	// 清除待定状态（未消耗次数，无需返还）
-	PendingItemRowName = NAME_None;
-	bItemUsedThisTurn = false;
+	if (TurnManager)
+		TurnManager->CancelWish();
 }
 
 void UElfBattleController::RefundItem(FName ItemRowName)
 {
-	int32* Remain = ItemRemainingUses.Find(ItemRowName);
-	if (Remain)
-	{
-		(*Remain)++;
-		OnItemUsed.Broadcast(ItemRowName, *Remain);
-	}
+	if (TurnManager)
+		TurnManager->RefundItem(ItemRowName);
 }
 
 void UElfBattleController::BroadcastHP()

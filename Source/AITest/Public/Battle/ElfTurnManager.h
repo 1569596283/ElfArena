@@ -6,6 +6,7 @@
 #include "UI/Battle/ElfPlayerInfo.h"
 #include "Elf/ElfManager.h"
 #include "Data/ElfSkillData.h"
+#include "Data/ElfItemData.h"
 #include "ElfTurnManager.generated.h"
 
 class UElfBattleController;
@@ -19,6 +20,7 @@ struct FBattleSideData;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnPhaseChanged, ETurnPhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSwitchRequested, EInfoSide, Side, int32, NextSlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnForcedSwitchRequested, EInfoSide, Side, int32, NextSlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnForcedSwitchAllComplete);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBattleEnded, EBattleResult, Result);
 
 UCLASS()
@@ -94,6 +96,9 @@ public:
 	FOnForcedSwitchRequested OnForcedSwitchRequested;
 
 	UPROPERTY(BlueprintAssignable)
+	FOnForcedSwitchAllComplete OnForcedSwitchAllComplete;
+
+	UPROPERTY(BlueprintAssignable)
 	FOnBattleEnded OnBattleEnded;
 
 	int32 PlayerChosenSlot = -1;
@@ -102,6 +107,32 @@ public:
 	int32 EnemyDefaultSlotIndex = -1;
 	bool bPlayerUsedDefault = false;
 	bool bEnemyUsedDefault = false;
+
+	// ===== 道具 / 捕捉状态机（由 BattleController 迁移而来） =====
+	void InitCaptureItemQuantities();
+	bool UseItem(FName ItemRowName);
+	bool CanUseBattleItem(FName ItemRowName) const;
+	int32 GetItemRemainingUses(FName ItemRowName) const;
+	bool IsItemCompatibleWithCreature(FName ItemRowName) const;
+	FName FindBattleItemRowName(EEffectID EffectID);
+	void UseBattleItem();
+	FName GetBattleItemRowName();
+	int32 GetBattleItemCount();
+	FName GetBattleItemAtSlot(int32 FlatIndex);
+	const TArray<FName>& GetBattleItemList();
+	void UseCaptureItem(int32 FlatIndex);
+	int32 GetCaptureItemCount();
+	FName GetCaptureItemAtSlot(int32 FlatIndex);
+	const TArray<FName>& GetCaptureItemList();
+	int32 GetCaptureItemQuantity(FName ItemRowName) const;
+	void ConsumePendingItem();
+	void CancelWish();
+	void RefundItem(FName ItemRowName);
+	void ResetBattleItemState();
+	void ClearCapturePending();
+	bool IsCapturePending() const { return bCapturePending; }
+	float GetCaptureBallRate() const { return PendingCaptureBallRate; }
+	bool IsBattleItemUsedThisTurn() const { return bItemUsedThisTurn; }
 
 protected:
 	enum class ECounterState : uint8
@@ -201,4 +232,30 @@ protected:
 
 	int32 PlayerFaintCount = 0;
 	int32 EnemyFaintCount = 0;
+
+	// 道具 / 捕捉状态（迁移自 BattleController）
+	UPROPERTY()
+	TMap<FName, int32> ItemRemainingUses;
+
+	UPROPERTY()
+	bool bItemUsedThisTurn = false;
+
+	UPROPERTY()
+	FName PendingItemRowName;
+
+	UPROPERTY()
+	bool bCapturePending = false;
+
+	UPROPERTY()
+	float PendingCaptureBallRate = 0.0f;
+
+	UPROPERTY()
+	TMap<FName, int32> CaptureItemQuantities;
+
+	TArray<FName> CachedCaptureItemList;
+	TArray<FName> CachedBattleItemList;
+	int32 LastBattleItemActiveIndex = -1;
+
+	FName CachedWishRowName;
+	FName CachedEvoRowName;
 };

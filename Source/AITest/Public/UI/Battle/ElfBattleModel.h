@@ -8,6 +8,7 @@
 #include "ElfBattleModel.generated.h"
 
 class UElfSkillBase;
+class UElfAbilityBase;
 
 USTRUCT(BlueprintType)
 struct FSkillInstanceList
@@ -31,6 +32,9 @@ struct FBattleSideData
 
 	UPROPERTY()
 	TArray<FSkillInstanceList> SkillInstances;
+
+	UPROPERTY()
+	TArray<UElfAbilityBase*> AbilityInstances;
 
 	UPROPERTY()
 	TArray<FSkillInstanceList> DefaultSkillInstances;

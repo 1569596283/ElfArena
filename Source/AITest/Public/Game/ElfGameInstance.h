@@ -48,6 +48,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "增益减益", meta = (DisplayName = "Buff定义表"))
 	TObjectPtr<UDataTable> BuffDataTable;
 
+	UPROPERTY(EditAnywhere, Category = "特性", meta = (DisplayName = "特性表"))
+	TObjectPtr<UDataTable> AbilityDataTable;
+
 	UPROPERTY(EditAnywhere, Category = "道具", meta = (DisplayName = "道具表"))
 	TObjectPtr<UDataTable> ItemDataTable;
 
@@ -83,6 +86,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "增益减益")
 	bool GetBuffData(FName RowName, struct FEffectData& OutData) const;
+
+	UFUNCTION(BlueprintCallable, Category = "特性")
+	bool GetAbilityData(FName RowName, struct FAbilityData& OutData) const;
 
 	UFUNCTION(BlueprintCallable, Category = "道具")
 	bool GetItemData(FName RowName, struct FItemData& OutData) const;

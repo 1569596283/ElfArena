@@ -1,5 +1,7 @@
 #include "Battle/ElfBattleManager.h"
 #include "Battle/ElfTurnManager.h"
+#include "Ability/ElfAbilityManager.h"
+#include "Game/ElfGameInstance.h"
 #include "UI/UIManager.h"
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
@@ -11,7 +13,6 @@
 #include "Player/ElfPlayerController.h"
 #include "Components/CapsuleComponent.h"
 #include "Data/ElfBaseData.h"
-#include "Game/ElfGameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
@@ -187,7 +188,19 @@ void UElfBattleManager::OnPlayerReadyStateChanged(bool bIsReady)
 
 void UElfBattleManager::OnForcedSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
 {
+	ForcedSwitchSides.AddUnique(Side);
 	RecallCreature(Side, NextSlotIndex, true);
+}
+
+void UElfBattleManager::OnForcedSwitchAllComplete()
+{
+	// 阵亡换将（情况1）：双方换完后统一触发入场特性，按速度先后
+	if (AbilityManager)
+	{
+		for (EInfoSide Side : ForcedSwitchSides)
+			AbilityManager->TriggerEnterForced(Side);
+	}
+	ForcedSwitchSides.Reset();
 }
 
 void UElfBattleManager::OnTurnSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
@@ -263,7 +276,8 @@ void UElfBattleManager::RecallCreature(EInfoSide Side, int32 NextSlotIndex, bool
 		{
 			if (Side == EInfoSide::Self && Creature->bWishActive)
 			{
-				BattleController->CancelWish();
+				if (TurnManager)
+					TurnManager->CancelWish();
 			}
 
 			for (int32 i = Creature->ActiveBuffs.Num() - 1; i >= 0; i--)
@@ -293,6 +307,13 @@ void UElfBattleManager::ExecutePendingRelease()
 	bRecallPending = false;
 
 	ReleaseCreature(PendingReleaseSide, PendingReleaseSlot);
+
+	// 特性触发：入场
+	// 情况2 手动切换 → 立即触发；情况1 阵亡换将 → 等双方换完后统一触发
+	if (AbilityManager && !bPendingReleaseIsForced)
+	{
+		AbilityManager->TriggerEnter(PendingReleaseSide);
+	}
 
 	if (bPendingReleaseIsForced && TurnManager)
 	{
@@ -429,11 +450,17 @@ void UElfBattleManager::EnterBattle()
 	TurnManager = NewObject<UElfTurnManager>(this);
 	UElfBattleModel* Model = BattleController ? BattleController->GetBattleModel() : nullptr;
 	TurnManager->Init(BattleController, Model);
+	BattleController->SetTurnManager(TurnManager);
+
+	AbilityManager = NewObject<UElfAbilityManager>(this);
+	AbilityManager->Init(BattleController, Model);
 
 	TurnManager->OnSwitchRequested.Clear();
 	TurnManager->OnSwitchRequested.AddDynamic(this, &UElfBattleManager::OnTurnSwitchRequested);
 	TurnManager->OnForcedSwitchRequested.Clear();
 	TurnManager->OnForcedSwitchRequested.AddDynamic(this, &UElfBattleManager::OnForcedSwitchRequested);
+	TurnManager->OnForcedSwitchAllComplete.Clear();
+	TurnManager->OnForcedSwitchAllComplete.AddDynamic(this, &UElfBattleManager::OnForcedSwitchAllComplete);
 	TurnManager->OnBattleEnded.Clear();
 	TurnManager->OnBattleEnded.AddDynamic(this, &UElfBattleManager::OnTurnBattleEnded);
 	TurnManager->OnTurnPhaseChanged.AddDynamic(this, &UElfBattleManager::OnTurnPhaseChanged);
@@ -470,6 +497,12 @@ void UElfBattleManager::EnterBattle()
 		{
 			TurnManager->OnCreatureEnteredField(EInfoSide::Enemy);
 		}
+	}
+
+	// 特性触发：进入战斗（双方入场，按速度先后触发）
+	if (AbilityManager)
+	{
+		AbilityManager->TriggerEnterBattle();
 	}
 
 	if (UIManager)

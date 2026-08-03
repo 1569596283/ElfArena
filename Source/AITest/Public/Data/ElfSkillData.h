@@ -98,7 +98,18 @@ enum class EEffectID : uint8
 	BlockSwitch           UMETA(DisplayName = "禁止替换"),
 
 	Evolution             UMETA(DisplayName = "超进化"),
-	WishSkill             UMETA(DisplayName = "愿力获得技能")
+	WishSkill             UMETA(DisplayName = "愿力获得技能"),
+
+	DirectDamageGain      UMETA(DisplayName = "直接伤害增益"),
+	DirectDamageReduce    UMETA(DisplayName = "直接伤害减免")
+};
+
+UENUM(BlueprintType)
+enum class EDirectGainCondition : uint8
+{
+	None             UMETA(DisplayName = "无条件"),
+	TargetBuffCount  UMETA(DisplayName = "对方增益数量"),
+	SelfBuffCount    UMETA(DisplayName = "己方增益数量")
 };
 
 USTRUCT(BlueprintType)
@@ -129,7 +140,7 @@ struct FEffectData : public FTableRowBase
 
 	// 三个通用参数，根据 EffectID 决定含义：
 	//
-	//   StatModPercent:          TargetStat=属性,  Value=百分比(0.1=+10%)
+	//   StatModPercent:          TargetStat=属性,  Value=百分比整数(10=+10%, -60=-60%)
 	//   ModifyFlat:              TargetStat=属性,  Value=数值
 	//   ModifySpeed:             Value=速度变化值
 	//   ModifyEnergyCost:        Value=能耗变化值
@@ -143,9 +154,14 @@ struct FEffectData : public FTableRowBase
 	//   ModifyHitCount:          Value=连击变化数
 	//   DoubleHitCount:          无参数
 	//   BlockSwitch:             无参数
+	//   DirectDamageGain:        GainCondition=条件类型,  Value=每单位增益倍率(0.1=+10%)
+	//   DirectDamageReduce:      GainCondition=条件类型,  Value=每单位减免倍率(0.1=-10%)
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "参数", meta = (DisplayName = "属性", EditCondition = "EffectID == EEffectID::StatModPercent || EffectID == EEffectID::ModifyFlat"))
 	EElfBuffStat TargetStat = EElfBuffStat::ATK;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "参数", meta = (DisplayName = "直接增益条件", ToolTip = "DirectDamageGain/Reduce 时指定：无条件 / 对方增益数量 / 己方增益数量", EditCondition = "EffectID == EEffectID::DirectDamageGain || EffectID == EEffectID::DirectDamageReduce"))
+	EDirectGainCondition GainCondition = EDirectGainCondition::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "参数", meta = (DisplayName = "数值"))
 	float Value = 0.0f;

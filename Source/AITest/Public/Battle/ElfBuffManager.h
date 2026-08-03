@@ -34,6 +34,9 @@ public:
 	int32 GetModifiedHitCount(EInfoSide Side, int32 BaseCount);
 	void GetModifiedStats(EInfoSide Side, FElfCalculatedStats& InOutStats);
 
+	// 直接伤害乘区（所有直接伤害增益相乘 × 所有直接伤害减免相乘）
+	float GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSide DefenderSide);
+
 	void ProcessTurnEndEffects(EInfoSide Side);
 	void OnCreatureEnteredField(EInfoSide Side);
 	bool IsSwitchBlocked(EInfoSide Side);
@@ -50,6 +53,9 @@ protected:
 	FElfCreatureInstance* GetActiveCreature(EInfoSide Side);
 	FElfCalculatedStats* GetActiveStats(EInfoSide Side);
 	UElfGameInstance* GetGameInstance() const;
+
+	// 计算直接增益条件对应的单位数
+	int32 GetGainConditionUnits(EInfoSide OwnerSide, EInfoSide OtherSide, EDirectGainCondition Cond);
 
 	UPROPERTY()
 	TObjectPtr<UElfBattleController> BattleController;

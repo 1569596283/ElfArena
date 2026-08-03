@@ -21,6 +21,8 @@ void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 
 	BattleAI = NewObject<UElfBattleAI>(this);
 
+	InitCaptureItemQuantities();
+
 	if (BattleController)
 	{
 		BattleController->OnSkillSelected.Clear();
@@ -40,7 +42,7 @@ void UElfTurnManager::StartTurn()
 {
 	if (BattleController)
 	{
-		BattleController->ResetBattleItemState();
+		ResetBattleItemState();
 		BattleController->SetInputMode(EBattleInputMode::Command);
 	}
 
@@ -374,10 +376,10 @@ void UElfTurnManager::OnExecutionTimer()
 
 	if (BattleController)
 	{
-		BattleController->ConsumePendingItem();
+		ConsumePendingItem();
 	}
 
-	if (BattleController && BattleController->IsCapturePending())
+	if (BattleController && IsCapturePending())
 	{
 		ProcessCapture();
 		if (CurrentPhase == ETurnPhase::BattleEnd) return;
@@ -530,7 +532,7 @@ void UElfTurnManager::ExecuteTurnAction(const FTurnAction& Action)
 	if (CurrentPhase == ETurnPhase::BattleEnd) return;
 
 	if (Action.Side == EInfoSide::Self && Actor->bWishActive)
-		BattleController->CancelWish();
+		CancelWish();
 
 	ForceSwitchSideCount = 0;
 	ForceSwitchCompleted = 0;
@@ -643,6 +645,9 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 		}
 	}
 	Damage = FMath::Max(1, FMath::RoundToInt(Damage * PowerMod));
+
+	// 独立乘区：直接伤害增益/减免（所有直接增益相乘）
+	Damage = FMath::Max(1, FMath::RoundToInt(Damage * BuffManager->GetDirectDamageMultiplier(AttackerSide, TargetSide)));
 
 	UElfGameInstance* GI = GetGameInstance();
 	if (GI)
@@ -895,6 +900,7 @@ void UElfTurnManager::OnForcedSwitchComplete()
 	ForceSwitchCompleted++;
 	if (ForceSwitchCompleted >= ForceSwitchSideCount)
 	{
+		OnForcedSwitchAllComplete.Broadcast();
 		ResumeAfterForcedSwitch();
 	}
 }
@@ -948,26 +954,26 @@ int32 UElfTurnManager::PickRandomAliveCreature(EInfoSide Side) const
 
 void UElfTurnManager::ProcessCapture()
 {
-	if (!BattleController || !BattleController->IsCapturePending()) return;
+	if (!BattleController || !IsCapturePending()) return;
 
 	ChangePhase(ETurnPhase::CapturePhase);
 
 	FElfCreatureInstance* Target = GetActiveCreature(EInfoSide::Enemy);
-	if (!Target) { BattleController->ClearCapturePending(); return; }
+	if (!Target) { ClearCapturePending(); return; }
 
 	UElfGameInstance* GI = GetGameInstance();
-	if (!GI) { BattleController->ClearCapturePending(); return; }
+	if (!GI) { ClearCapturePending(); return; }
 
 	FElfBaseData BaseData;
-	if (!GI->GetElfBaseData(Target->CreatureRowName, BaseData)) { BattleController->ClearCapturePending(); return; }
+	if (!GI->GetElfBaseData(Target->CreatureRowName, BaseData)) { ClearCapturePending(); return; }
 
 	float Difficulty = FMath::Max(0.1f, BaseData.CaptureDifficulty);
-	float BallRate = FMath::Max(0.1f, BattleController->GetCaptureBallRate());
+	float BallRate = FMath::Max(0.1f, GetCaptureBallRate());
 	float Chance = BallRate / Difficulty;
 
 	bool bSuccess = FMath::FRandRange(0.0f, 1.0f) <= Chance;
 
-	BattleController->ClearCapturePending();
+	ClearCapturePending();
 	bCaptureAttempted = true;
 
 	if (bSuccess)
@@ -1310,4 +1316,428 @@ UElfGameInstance* UElfTurnManager::GetGameInstance() const
 	if (!BattleController) return nullptr;
 	APlayerController* PC = BattleController->GetOwnerPC();
 	return PC ? PC->GetGameInstance<UElfGameInstance>() : nullptr;
+}
+
+// ==================== 道具 / 捕捉（迁移自 BattleController） ====================
+
+void UElfTurnManager::InitCaptureItemQuantities()
+{
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI || !GI->ItemDataTable) return;
+
+	CaptureItemQuantities.Empty();
+	static const FString Context(TEXT("ReplenishCapture"));
+	TArray<FName> RowNames = GI->ItemDataTable->GetRowNames();
+	for (const FName& RowName : RowNames)
+	{
+		const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
+		if (Item && Item->ItemType == EItemType::Capture)
+			CaptureItemQuantities.Add(RowName, 5);
+	}
+}
+
+bool UElfTurnManager::UseItem(FName ItemRowName)
+{
+	if (ItemRowName.IsNone()) return false;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) return false;
+
+	FItemData ItemDef;
+	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
+
+	if (ItemDef.ItemType != EItemType::Battle) return false;
+
+	// 重复点击 → 取消
+	if (PendingItemRowName == ItemRowName)
+	{
+		if (ItemDef.EffectID == EEffectID::WishSkill)
+			CancelWish();
+		else
+		{
+			FElfCreatureInstance* Creature = BattleModel ? BattleModel->PlayerSide.GetActiveCreature() : nullptr;
+			if (Creature) Creature->bPendingEvolution = false;
+			PendingItemRowName = NAME_None;
+			bItemUsedThisTurn = false;
+		}
+		return true;
+	}
+
+	int32* Remain = ItemRemainingUses.Find(ItemRowName);
+	int32 UsesLeft = Remain ? *Remain : ItemDef.MaxBattleUses;
+	if (UsesLeft <= 0) return false;
+
+	FElfCreatureInstance* Creature = BattleModel ? BattleModel->PlayerSide.GetActiveCreature() : nullptr;
+	if (!Creature) return false;
+
+	switch (ItemDef.EffectID)
+	{
+	case EEffectID::Evolution:
+	{
+		FElfBaseData BaseData;
+		if (GI->GetElfBaseData(Creature->CreatureRowName, BaseData) && BaseData.Type3 == EElfType::Leader && !BaseData.EvolutionTarget.RowName.IsNone())
+		{
+			Creature->bPendingEvolution = true;
+		}
+		break;
+	}
+	case EEffectID::WishSkill:
+	{
+		if (!ItemDef.TargetRowName.IsNone())
+		{
+			FElfBaseData BaseData;
+			bool bHasBaseData = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
+			if (bHasBaseData && BaseData.Type3 == EElfType::Leader) break;
+
+			EElfType BloodlineType = bHasBaseData ? BaseData.Type3 : EElfType::Normal;
+			int32 ActiveIdx = BattleModel->PlayerSide.ActiveIndex;
+
+			// 存档原技能0，替换为愿力冲击
+			Creature->BackupFirstSkill = Creature->EquippedSkills.IsValidIndex(0) ? Creature->EquippedSkills[0] : FName();
+			Creature->EquippedSkills[0] = ItemDef.TargetRowName;
+			Creature->bWishActive = true;
+
+			// 创建愿力冲击技能实例
+			FSkillData SkillData;
+			if (GI->GetSkillData(ItemDef.TargetRowName, SkillData) && SkillData.SkillClass)
+			{
+				SkillData.ElementType = BloodlineType;
+				UElfSkillBase* Instance = NewObject<UElfSkillBase>(BattleModel, SkillData.SkillClass);
+				Instance->Init(SkillData);
+
+				if (BattleModel->PlayerSide.SkillInstances.IsValidIndex(ActiveIdx))
+				{
+					if (BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.IsValidIndex(0))
+						BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances[0] = Instance;
+					else
+						BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.Insert(Instance, 0);
+				}
+			}
+		}
+		break;
+	}
+	default:
+		return false;
+	}
+
+	bItemUsedThisTurn = true;
+	PendingItemRowName = ItemRowName;
+
+	return true;
+}
+
+bool UElfTurnManager::CanUseBattleItem(FName ItemRowName) const
+{
+	if (bItemUsedThisTurn) return false;
+
+	if (!BattleModel) return false;
+	const FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
+	if (!Creature) return false;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) return false;
+
+	FItemData ItemDef;
+	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
+
+	FElfBaseData BaseData;
+	bool bHasBase = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
+	if (ItemDef.EffectID == EEffectID::WishSkill)
+	{
+		if (!bHasBase || BaseData.Type3 == EElfType::Leader) return false;
+	}
+	else if (ItemDef.EffectID == EEffectID::Evolution)
+	{
+		if (!bHasBase || BaseData.Type3 != EElfType::Leader) return false;
+	}
+
+	return true;
+}
+
+int32 UElfTurnManager::GetItemRemainingUses(FName ItemRowName) const
+{
+	// 初始化：从数据表读取最大使用次数
+	UElfGameInstance* GI = GetGameInstance();
+
+	if (GI)
+	{
+		FItemData ItemData;
+		if (GI->GetItemData(ItemRowName, ItemData) && !ItemRemainingUses.Contains(ItemRowName))
+		{
+			const_cast<UElfTurnManager*>(this)->ItemRemainingUses.Add(ItemRowName, ItemData.MaxBattleUses);
+		}
+	}
+
+	// 检查是否有其他战斗道具已被使用（每局只能用一个）
+	if (GI && GI->ItemDataTable)
+	{
+		static const FString Context(TEXT("GetBattleItemUses"));
+		TArray<FName> RowNames = GI->ItemDataTable->GetRowNames();
+		for (const FName& Other : RowNames)
+		{
+			if (Other == ItemRowName) continue;
+			const FItemData* OtherData = GI->ItemDataTable->FindRow<FItemData>(Other, Context);
+			if (OtherData && OtherData->ItemType == EItemType::Battle)
+			{
+				const int32* Remain = ItemRemainingUses.Find(Other);
+				if (Remain && *Remain < OtherData->MaxBattleUses)
+					return 0;
+			}
+		}
+	}
+
+	const int32* Remain = ItemRemainingUses.Find(ItemRowName);
+	return Remain ? *Remain : 0;
+}
+
+bool UElfTurnManager::IsItemCompatibleWithCreature(FName ItemRowName) const
+{
+	if (!BattleModel) return false;
+	const FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
+	if (!Creature) return false;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) return false;
+
+	FItemData ItemDef;
+	if (!GI->GetItemData(ItemRowName, ItemDef)) return false;
+
+	FElfBaseData BaseData;
+	bool bHasBase = GI->GetElfBaseData(Creature->CreatureRowName, BaseData);
+	if (!bHasBase) return false;
+
+	if (ItemDef.EffectID == EEffectID::WishSkill)
+		return BaseData.Type3 != EElfType::Leader;
+	if (ItemDef.EffectID == EEffectID::Evolution)
+		return BaseData.Type3 == EElfType::Leader;
+
+	return false;
+}
+
+FName UElfTurnManager::FindBattleItemRowName(EEffectID EffectID)
+{
+	// 缓存已查到的行名
+	if (EffectID == EEffectID::WishSkill && !CachedWishRowName.IsNone())
+		return CachedWishRowName;
+	if (EffectID == EEffectID::Evolution && !CachedEvoRowName.IsNone())
+		return CachedEvoRowName;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI || !GI->ItemDataTable) return NAME_None;
+
+	static const FString Context(TEXT("FindBattleItem"));
+	TArray<FName> RowNames = GI->ItemDataTable->GetRowNames();
+	for (const FName& RowName : RowNames)
+	{
+		const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
+		if (Item && Item->ItemType == EItemType::Battle && Item->EffectID == EffectID)
+		{
+			if (EffectID == EEffectID::WishSkill) CachedWishRowName = RowName;
+			if (EffectID == EEffectID::Evolution) CachedEvoRowName = RowName;
+			return RowName;
+		}
+	}
+	return NAME_None;
+}
+
+void UElfTurnManager::UseBattleItem()
+{
+	FName WishRow = FindBattleItemRowName(EEffectID::WishSkill);
+	FName EvoRow = FindBattleItemRowName(EEffectID::Evolution);
+	FName ItemToUse = (!WishRow.IsNone() && IsItemCompatibleWithCreature(WishRow)) ? WishRow : EvoRow;
+	if (!ItemToUse.IsNone())
+	{
+		UseItem(ItemToUse);
+		if (BattleController)
+			BattleController->OnBattleItemClicked.Broadcast(ItemToUse);
+	}
+}
+
+FName UElfTurnManager::GetBattleItemRowName()
+{
+	FName WishRow = FindBattleItemRowName(EEffectID::WishSkill);
+	FName EvoRow = FindBattleItemRowName(EEffectID::Evolution);
+
+	if (IsItemCompatibleWithCreature(WishRow))
+		return WishRow;
+	if (IsItemCompatibleWithCreature(EvoRow))
+		return EvoRow;
+	return NAME_None;
+}
+
+int32 UElfTurnManager::GetBattleItemCount()
+{
+	return GetBattleItemList().Num();
+}
+
+FName UElfTurnManager::GetBattleItemAtSlot(int32 FlatIndex)
+{
+	return GetBattleItemList().IsValidIndex(FlatIndex) ? GetBattleItemList()[FlatIndex] : NAME_None;
+}
+
+const TArray<FName>& UElfTurnManager::GetBattleItemList()
+{
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI || !GI->ItemDataTable) return CachedBattleItemList;
+
+	// 检查精灵是否变更
+	int32 CurrentActive = BattleModel ? BattleModel->PlayerSide.ActiveIndex : -1;
+	if (CurrentActive == LastBattleItemActiveIndex && !CachedBattleItemList.IsEmpty())
+		return CachedBattleItemList;
+
+	LastBattleItemActiveIndex = CurrentActive;
+	CachedBattleItemList.Empty();
+
+	static const FString Context(TEXT("BuildBattleItemList"));
+	for (const FName& RowName : GI->ItemDataTable->GetRowNames())
+	{
+		const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
+		if (Item && Item->ItemType == EItemType::Battle && IsItemCompatibleWithCreature(RowName))
+			CachedBattleItemList.Add(RowName);
+	}
+	return CachedBattleItemList;
+}
+
+void UElfTurnManager::UseCaptureItem(int32 FlatIndex)
+{
+	const TArray<FName>& List = GetCaptureItemList();
+	if (!List.IsValidIndex(FlatIndex)) return;
+
+	FName RowName = List[FlatIndex];
+	int32* Qty = CaptureItemQuantities.Find(RowName);
+	if (!Qty || *Qty <= 0) return;
+
+	(*Qty)--;
+	if (UElfGameInstance* GI = GetGameInstance())
+	{
+		if (int32* GIQty = GI->CaptureItemQuantities.Find(RowName))
+			(*GIQty)--;
+	}
+	bCapturePending = true;
+	PendingCaptureBallRate = 0.0f;
+
+	UElfGameInstance* GI2 = GetGameInstance();
+	FItemData ItemData;
+	if (GI2 && GI2->GetItemData(RowName, ItemData) && ItemData.Params.IsValidIndex(0))
+		PendingCaptureBallRate = ItemData.Params[0];
+
+	bItemUsedThisTurn = true;
+	if (BattleController)
+		BattleController->OnCaptureConfirmed.Broadcast();
+}
+
+int32 UElfTurnManager::GetCaptureItemCount()
+{
+	return GetCaptureItemList().Num();
+}
+
+FName UElfTurnManager::GetCaptureItemAtSlot(int32 FlatIndex)
+{
+	GetCaptureItemList(); // 确保列表已构建
+	return CachedCaptureItemList.IsValidIndex(FlatIndex) ? CachedCaptureItemList[FlatIndex] : NAME_None;
+}
+
+const TArray<FName>& UElfTurnManager::GetCaptureItemList()
+{
+	if (CachedCaptureItemList.IsEmpty())
+	{
+		CachedCaptureItemList.Empty();
+		UElfGameInstance* GI = GetGameInstance();
+		if (GI && GI->ItemDataTable)
+		{
+			static const FString Context(TEXT("BuildCaptureList"));
+			for (const FName& RowName : GI->ItemDataTable->GetRowNames())
+			{
+				const FItemData* Item = GI->ItemDataTable->FindRow<FItemData>(RowName, Context);
+				if (Item && Item->ItemType == EItemType::Capture)
+					CachedCaptureItemList.Add(RowName);
+			}
+		}
+	}
+	return CachedCaptureItemList;
+}
+
+int32 UElfTurnManager::GetCaptureItemQuantity(FName ItemRowName) const
+{
+	return CaptureItemQuantities.FindRef(ItemRowName);
+}
+
+void UElfTurnManager::ConsumePendingItem()
+{
+	if (PendingItemRowName.IsNone()) return;
+
+	UElfGameInstance* GI = GetGameInstance();
+	if (!GI) return;
+
+	FItemData ItemData;
+	if (!GI->GetItemData(PendingItemRowName, ItemData)) return;
+
+	int32* Remain = ItemRemainingUses.Find(PendingItemRowName);
+	int32 Uses = Remain ? *Remain : ItemData.MaxBattleUses;
+	if (Uses <= 0) return;
+
+	Uses--;
+	ItemRemainingUses.Add(PendingItemRowName, Uses);
+	if (BattleController)
+		BattleController->OnItemUsed.Broadcast(PendingItemRowName, Uses);
+
+	PendingItemRowName = NAME_None;
+}
+
+void UElfTurnManager::CancelWish()
+{
+	if (!BattleModel) return;
+	FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
+	if (!Creature || !Creature->bWishActive) return;
+
+	// 恢复原技能
+	Creature->EquippedSkills[0] = Creature->BackupFirstSkill;
+	Creature->bWishActive = false;
+
+	// 重新创建技能0的实例
+	int32 ActiveIdx = BattleModel->PlayerSide.ActiveIndex;
+	if (BattleModel->PlayerSide.SkillInstances.IsValidIndex(ActiveIdx))
+	{
+		if (!Creature->BackupFirstSkill.IsNone())
+		{
+			UElfGameInstance* GI = GetGameInstance();
+			FSkillData SkillData;
+			if (GI && GI->GetSkillData(Creature->BackupFirstSkill, SkillData) && SkillData.SkillClass)
+			{
+				UElfSkillBase* Instance = NewObject<UElfSkillBase>(BattleModel, SkillData.SkillClass);
+				Instance->Init(SkillData);
+				if (BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances.IsValidIndex(0))
+					BattleModel->PlayerSide.SkillInstances[ActiveIdx].Instances[0] = Instance;
+			}
+		}
+	}
+
+	// 清除待定状态（未消耗次数，无需返还）
+	PendingItemRowName = NAME_None;
+	bItemUsedThisTurn = false;
+}
+
+void UElfTurnManager::RefundItem(FName ItemRowName)
+{
+	int32* Remain = ItemRemainingUses.Find(ItemRowName);
+	if (Remain)
+	{
+		(*Remain)++;
+		if (BattleController)
+			BattleController->OnItemUsed.Broadcast(ItemRowName, *Remain);
+	}
+}
+
+void UElfTurnManager::ResetBattleItemState()
+{
+	bItemUsedThisTurn = false;
+	PendingItemRowName = NAME_None;
+	bCapturePending = false;
+	PendingCaptureBallRate = 0.0f;
+}
+
+void UElfTurnManager::ClearCapturePending()
+{
+	bCapturePending = false;
+	PendingCaptureBallRate = 0.0f;
 }

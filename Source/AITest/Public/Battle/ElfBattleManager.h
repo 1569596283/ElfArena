@@ -11,6 +11,7 @@
 class UUIManager;
 class UElfBattleController;
 class UElfTurnManager;
+class UElfAbilityManager;
 class UUserWidget;
 
 UCLASS(Blueprintable)
@@ -51,6 +52,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	UElfTurnManager* GetTurnManager() const { return TurnManager; }
 
+	UFUNCTION(BlueprintPure, Category = "特性")
+	UElfAbilityManager* GetAbilityManager() const { return AbilityManager; }
+
 	UFUNCTION(BlueprintPure)
 	APlayerController* GetOwnerPC() const { return OwnerPC; }
 
@@ -65,6 +69,9 @@ public:
 
 	UFUNCTION()
 	void OnForcedSwitchRequested(EInfoSide Side, int32 NextSlotIndex);
+
+	UFUNCTION()
+	void OnForcedSwitchAllComplete();
 
 	UFUNCTION()
 	void OnTurnBattleEnded(EBattleResult Result);
@@ -97,6 +104,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UElfTurnManager> TurnManager;
+
+	UPROPERTY()
+	TObjectPtr<UElfAbilityManager> AbilityManager;
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> IntroWidget;
@@ -145,6 +155,9 @@ private:
 
 	UPROPERTY()
 	bool bPendingReleaseIsForced = false;
+
+	// 阵亡换将中涉及换将的侧（用于换完统一触发入场）
+	TArray<EInfoSide> ForcedSwitchSides;
 
 	TArray<FScaleAnim> ActiveAnimations;
 	TArray<FRecallAnim> ActiveRecallAnimations;

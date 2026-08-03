@@ -25,6 +25,23 @@ public:
 	FGameplayTag Input_R;
 	FGameplayTag Input_Escape;
 
+	// 触发时机事件（Battle.Trigger.*）
+	FGameplayTag Battle_Trigger_EnterBattle;
+	FGameplayTag Battle_Trigger_OnField;
+	FGameplayTag Battle_Trigger_TurnStart;
+	FGameplayTag Battle_Trigger_TurnEnd;
+	FGameplayTag Battle_Trigger_DealSuperEffective;
+	FGameplayTag Battle_Trigger_UseElementSkill;
+	FGameplayTag Battle_Trigger_FirstAttack;
+	FGameplayTag Battle_Trigger_TakeDamage;
+	FGameplayTag Battle_Trigger_OnBench;
+	FGameplayTag Battle_Trigger_OnDeath;
+	FGameplayTag Battle_Trigger_EnemyLeftField;
+	FGameplayTag Battle_Trigger_RestoreEnergy;
+	FGameplayTag Battle_Trigger_SelfLeftField;
+	FGameplayTag Battle_Trigger_SelfHasBuff;
+	FGameplayTag Battle_Trigger_EnemyHasBuffOrDebuff;
+
 private:
     static FElfGameplayTags GameplayTags;
 };

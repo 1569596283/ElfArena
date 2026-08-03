@@ -4,7 +4,7 @@
 #include "Data/ElfItemData.h"
 #include "Data/ImageData.h"
 #include "Data/ElfSkillData.h"
-#include "Data/ElfItemData.h"
+#include "Data/ElfAbilityData.h"
 #include "Elf/ElfManager.h"
 #include "Engine/DataTable.h"
 #include "UObject/EnumProperty.h"
@@ -142,6 +142,16 @@ bool UElfGameInstance::GetItemData(FName RowName, FItemData& OutData) const
 	if (!ItemDataTable || RowName.IsNone()) return false;
 	static const FString ContextStr(TEXT("	ItemDataLookup"));
 	const FItemData* Found = ItemDataTable->FindRow<FItemData>(RowName, ContextStr);
+	if (!Found) return false;
+	OutData = *Found;
+	return true;
+}
+
+bool UElfGameInstance::GetAbilityData(FName RowName, FAbilityData& OutData) const
+{
+	if (!AbilityDataTable || RowName.IsNone()) return false;
+	static const FString ContextStr(TEXT("AbilityDataLookup"));
+	const FAbilityData* Found = AbilityDataTable->FindRow<FAbilityData>(RowName, ContextStr);
 	if (!Found) return false;
 	OutData = *Found;
 	return true;
