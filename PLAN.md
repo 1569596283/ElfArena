@@ -300,57 +300,65 @@
 - 特性是一种被动效果，在**各种时机**可能触发
 - 特性效果多种多样（增伤、减伤、回复、改变属性等），复用 `FSkillEffect` / `FEffectData` 风格
 
-#### 数据表结构（设计决策已确认）
+#### 数据表结构（已实现）
 
 - **`DT_Ability`（`FAbilityData`）**：特性定义表
-- 触发时机用 `EAbilityTrigger` 枚举表达
-- 效果复用 `FSkillEffect` / `FEffectData` 风格
+  - `AbilityClass`（`TSubclassOf<UElfAbilityBase>`）— 默认基类，特殊特性用子类
+  - `Name / Description / Icon`
+  - `Trigger`（`FGameplayTag`）— 触发时机，`Battle.Trigger.*` 系列
+  - `TriggerChance`（概率）、`HPThreshold`（血量阈值）、`TargetElement`（指定属性）、`BuffRowName`（指定增益）
+  - `Effects`（`TArray<FSkillEffect>`）— 效果列表
+  - `TriggerDelay`（秒）— 触发延迟，>0 时特性完成后等待该时长再进入下一阶段（用于播动画）
 
-#### 效果实现方式（设计决策已确认）
+#### 触发时机（GameplayTag，已实现）
+
+触发时机用 **`FGameplayTag`** 表达（`ElfGameplayTags` 定义 `Battle_Trigger_*` 15 个），不再是枚举：
+`EnterBattle / OnField / TurnStart / TurnEnd / DealSuperEffective / UseElementSkill / FirstAttack / TakeDamage / OnBench / OnDeath / EnemyLeftField / RestoreEnergy / SelfLeftField / SelfHasBuff / EnemyHasBuffOrDebuff`
+
+#### 效果实现方式（已实现）
 
 - **混合模式（与技能系统一致）**：
-  - `FAbilityData` 内含 `AbilityClass`（`TSubclassOf<UElfAbilityBase>`），默认基类
-  - `UElfAbilityBase`（UObject 抽象基类）：`TriggerAbility()` 虚函数，默认遍历 `Effects` 走通用效果
-  - 通用效果复用 `FSkillEffect` / 现有 BuffManager 接口（增伤/减伤/回复/加Buff等）
-  - **特殊特性才新建 C++ 子类**重写 `TriggerAbility()` / `CanTrigger()`（如现有 EffectID 表达不了的逻辑）
-  - 实例化方式与技能一致：`NewObject<UElfAbilityBase>(Outer, AbilityClass)`
+  - `UElfAbilityBase`（UObject 基类，非抽象，可数据驱动直接使用）：`TriggerAbility()` 默认遍历 `Effects` 走通用效果
+  - 通用效果复用 `FSkillEffect` / BuffManager 接口（回血/回能/加Buff/加Debuff）
+  - **特殊特性才新建 C++ 子类**重写 `TriggerAbility()` / `CanTrigger()`
+  - 基类持 `SetContext(BattleModel, BuffManager, TurnManager, BattleController)` 注入本局上下文
 
-#### 效果落地规则（设计决策已确认）
+#### 效果落地规则（已实现）
 
-- **一次性效果**：触发时立刻执行 `Effects` 列表（`HealHPPercent` 回血 / `RestoreEnergy` 回能 / `AddBuff`、`AddDebuff` 施加增益），基类默认实现与 `ApplyStatusEffects` 逻辑一致
-- **常驻效果**（"在场上就生效"）：本质 = 施放 **`Duration=-1 + bPersistent` 的 Buff**（指向 `DT_BuffDef`），统一走 `Effects` 列表里的 `AddBuff`，无需区分形态
-- **属性增减**（攻击/防御/速度等）：走 Buff 属性修正（`EElfBuffStat` + `StatModPercent` / `ModifyFlat`）
-- **直接伤害增减**（伤害+50% / 受到伤害-30%）：不走属性，走**独立乘区**——新增伤害计算钩子，在伤害公式处额外乘算
+- **一次性效果**：触发时立刻执行 `Effects` 列表（`HealHPPercent` 回血 / `RestoreEnergy` 回能 / `AddBuff`、`AddDebuff` 施加增益）
+- **常驻效果**（"在场上就生效"）：本质 = 施放 **`Duration=-1 + bPersistent` 的 Buff**，统一走 `Effects` 里的 `AddBuff`
+- **属性增减**：走 Buff 属性修正（`EElfBuffStat` + `StatModPercent` / `ModifyFlat`），**Value 填整数百分比**（`10`=+10%, `-10`=-10%）
+- **直接伤害增减**：独立乘区（`DirectDamageGain`/`DirectDamageReduce`），伤害公式处额外乘算
 
-#### 实例生命周期（设计决策已确认）
+#### 实例生命周期（已实现）
 
-- **战斗时创建**：进入战斗时按精灵实例化，存 `BattleModel`，战斗结束销毁
-- 大世界状态不持有特性实例
+- **战斗时创建**：`UElfAbilityManager::CreateAbilityInstances()`（在 `EnterBattle`，TurnManager/BuffManager 已就绪后）创建，存 `FBattleSideData::AbilityInstances`
+- 每个特性实例创建时 `Init(AbilityID, Trigger, Effects, TriggerDelay)` + `SetContext(...)` 注入本局引用
+- 战斗结束随 BattleModel 销毁
 
-#### 触发条件（设计决策已确认）
+#### 特性管理器（已实现）
 
-- 数值字段（概率 / 血量阈值等）**配置在 `FAbilityData` 数据表内**
-- 每个字段带**中文说明（ToolTip）**，说明字段内容本身也可配置
-- 基类 `CanTrigger()` 统一读取并判断
+- **`UElfAbilityManager`**（由 BattleManager 持有，与 TurnManager 平级）：
+  - 创建/持有特性实例、注入上下文
+  - 入场触发：`TriggerEnter(Side)` 手动切换 / `TriggerEnterBattle()` 战斗开始（按速度先后 + 间隔）/ `TriggerEnterForced(Side)` 阵亡换将
+  - 事件触发：订阅全局事件总线 `UElfEventManager`，`TriggerByEvent(Tag, Creature)` 按精灵定位触发
+  - 触发完成后：`OnAllAbilitiesTriggered` 委托（含 `TriggerDelay` 延迟等待）
+  - 播报：`BattleController->OnCreatureAbility.Broadcast(Side, AbilityID)`
 
-#### 触发时机清单（`EAbilityTrigger` 枚举候选）
+#### 全局事件总线（已实现）
 
-| 触发时机 | 说明 | 备注 |
-|----------|------|------|
-| 造成克制伤害后 | 造成克制伤害时 | 每次技能释放判断，**连击只算一次** |
-| 使用某种属性的技能后 | 使用指定属性技能时 | 属性由配置指定 |
-| 精灵在场上就生效 | 常驻被动 | 上场持续生效，非一次性 |
-| 先手攻击时 | 本回合先手出手时 | |
-| 回合结束 | 回合结束阶段 | |
-| 受到攻击伤害时 | 受到伤害时 | **连击时多次计算** |
-| 在场下时 | 精灵在队伍中未上场时 | 非上场状态生效 |
-| 精灵死亡时 | 自身死亡时 | |
-| 敌方精灵离场后 | 敌方精灵被击倒/离场后 | |
-| 回复能量时 | 能量恢复时 | |
-| 己方离场时 | 己方精灵离场/收回时 | |
-| 己方有某种增益时 | 己方持有指定增益时 | 增益由配置指定 |
-| 对方有某种减益或增益时 | 对方持有指定减益/增益时 | 由配置指定 |
-| …（可扩展） | 其他自定义时机 | |
+- **`UElfEventManager`**（GameInstanceSubsystem）：`BroadcastEvent(Tag, Creature)` + `OnGameplayEvent` 原生多播委托
+- 用途：触发时机分发（特性等 C++ 订阅），UI 播报走 BattleController 的 `OnCreatureAbility`（蓝图可绑）
+
+#### 入场阶段（已实现）
+
+- `ETurnPhase::EnterPhase` 精灵入场阶段：战斗开始后先进入，UI 隐藏按钮/禁用输入
+- 流程：`BeginEnterPhase()` → 精灵入场动画（0.4s）→ 0.6s 后 `TriggerEnterBattle()`（双方特性按速度+间隔+延迟触发）→ `OnAllAbilitiesTriggered` → `StartTurn()` 进入玩家决策
+- 双方特性触发间隔 = 快方特性的 `TriggerDelay`（≤0 时保底 0.5s）
+
+#### 触发条件（已实现）
+
+- 数值字段（概率 / 血量阈值等）配置在 `FAbilityData` 内，基类 `CanTrigger()` 统一判断（当前默认恒真，子类可重写）
 
 ### 7.8 最终属性计算
 
@@ -669,16 +677,17 @@ PlayerDecision（下一回合）
 - `Def` 后缀不再使用
 - 类型枚举值通过 `EffectID` 识别，不依赖行名
 
-## 17. 职责拆分（待办，特性完成后处理）
+## 17. 职责拆分
 
 **目标**：`UElfBattleController` 当前职责混杂（UI 数据查询 / UI 事件总线 / 输入路由 / 道具捕捉状态机），需分层。
 
-**第 1 步（进行中）**：道具/捕捉状态机迁到 `UElfTurnManager`
-- 迁移状态：`ItemRemainingUses`、`bItemUsedThisTurn`、`PendingItemRowName`、`bCapturePending`、`PendingCaptureBallRate`、`CaptureItemQuantities`
-- 迁移逻辑：`UseItem`、`UseCaptureItem`、`UseBattleItem`、`ConsumePendingItem`、`CancelWish`、`RefundItem`、`ResetBattleItemState`、`FindBattleItemRowName`、`CanUseBattleItem`、`GetItemRemainingUses`、`IsItemCompatibleWithCreature`、`InitCaptureItemQuantities`、`ClearCapturePending`、`IsCapturePending`、`GetCaptureBallRate`、`GetCaptureItemQuantity`
+**第 1 步（已完成）**：道具/捕捉状态机迁到 `UElfTurnManager`
+- 状态迁移完成：`ItemRemainingUses`、`bItemUsedThisTurn`、`PendingItemRowName`、`bCapturePending`、`PendingCaptureBallRate`、`CaptureItemQuantities`
+- 逻辑迁移完成：`UseItem`、`UseCaptureItem`、`UseBattleItem`、`ConsumePendingItem`、`CancelWish`、`RefundItem`、`ResetBattleItemState`、`FindBattleItemRowName`、`CanUseBattleItem`、`GetItemRemainingUses`、`IsItemCompatibleWithCreature`、`InitCaptureItemQuantities`、`ClearCapturePending`、`IsCapturePending`、`GetCaptureBallRate`、`GetCaptureItemQuantity`
 - `BattleController` 保留薄转发接口（含 Blueprint 标记，避免断蓝图引用），内部调用 TurnManager
+- BattleManager 在 `EnterBattle` 用 `Controller->SetTurnManager(TurnManager)` 建立连接
 
-**第 2 步（后续）**：拆分 Controller 的查询/事件/输入职责
+**第 2 步（待办）**：拆分 Controller 的查询/事件/输入职责
 - UI 数据查询（GetXxx）与事件总线保留在 Controller（薄层）
 - 输入路由 `HandleInput` 可独立或保留
 - 明确 Controller 不再持有战斗规则状态

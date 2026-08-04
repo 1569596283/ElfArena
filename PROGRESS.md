@@ -220,6 +220,31 @@
 - NPCCharacter（BattleTrigger + NPCDataID）
 - NPCSpawner（子 SceneComponent 标记生成点）
 
+## 特性系统（Ability）
+
+### 数据与结构
+- `FAbilityData`（`DT_Ability`）— 特性定义表：`AbilityClass` / `Trigger`(FGameplayTag) / `TriggerChance` / `HPThreshold` / `TargetElement` / `BuffRowName` / `Effects` / `TriggerDelay`
+- 触发时机用 `FGameplayTag`（`ElfGameplayTags` 定义 `Battle_Trigger_*` 15 个：入场/在场/回合开始/回合结束/克制伤害/属性技能/先手/受击/场下/死亡/敌离场/回能/己离场/持增益等）
+- `GameInstance` 挂 `AbilityDataTable` + `GetAbilityData()`
+
+### 框架
+- `UElfAbilityBase`（非抽象基类，可数据驱动）：`Init(AbilityID, Trigger, Effects, Delay)` + `SetContext(Model, BuffMgr, TurnMgr, BattleController)` + `CanTrigger` / `TriggerAbility`（默认遍历 Effects 执行回血/回能/加Buff/加Debuff）
+- `UElfAbilityManager`（BattleManager 持有）：创建特性实例、注入上下文、三种入场触发（`TriggerEnter`/`TriggerEnterBattle`/`TriggerEnterForced`）、事件触发（`TriggerByEvent`）、延迟完成（`OnAllAbilitiesTriggered`）
+- `UElfEventManager`（GameInstanceSubsystem 全局事件总线）：`BroadcastEvent(Tag, Creature)` + `OnGameplayEvent`，触发时机分发用
+- 特性实例存 `FBattleSideData::AbilityInstances`，`EnterBattle` 时创建
+
+### 入场阶段
+- `ETurnPhase::EnterPhase` 精灵入场阶段（战斗开始后 UI 隐藏按钮/禁用输入）
+- 流程：`BeginEnterPhase` → 入场动画 → `TriggerEnterBattle`（双方按速度先后 + 间隔触发）→ `OnAllAbilitiesTriggered` → `StartTurn`
+- 双方触发间隔 = 快方特性的 `TriggerDelay`（≤0 保底 0.5s）
+- 播报：`BattleController->OnCreatureAbility(Side, AbilityID)`（UI 蓝图绑定弹提示）
+
+### 关联修改
+- Buff `StatModPercent`：Value 填**整数百分比**（代码 /100），增益 `×(1+x)` / 减益 `×100/(100+x)`，同属性增益/减益**净额抵消**
+- `EEffectID` 新增 `DirectDamageGain` / `DirectDamageReduce`（直接伤害乘区，`EDirectGainCondition` 条件）
+- `EEffectID` 枚举末尾追加新值（避免破坏已有序列化）
+- `DT_Buff` 重建（删除废弃的 `DT_BuffDef` 重定向器），`BP_GameInstance` 需挂 `BuffDataTable` / `AbilityDataTable`
+
 ## 多人模式支持
 - PlayerState 数据复制（TeamCreatures、WarehouseCreatures、AvatarID、CardID）
 - Server RPC 队伍操作
