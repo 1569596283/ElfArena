@@ -4,11 +4,12 @@
 #include "UI/Battle/ElfBattleModel.h"
 #include "Elf/ElfManager.h"
 
-void UElfAbilityBase::Init(const FName& InAbilityID, const FGameplayTag& InTrigger, const TArray<FSkillEffect>& InEffects)
+void UElfAbilityBase::Init(const FName& InAbilityID, const FGameplayTag& InTrigger, const TArray<FSkillEffect>& InEffects, float InTriggerDelay)
 {
 	AbilityID = InAbilityID;
 	Trigger = InTrigger;
 	Effects = InEffects;
+	TriggerDelay = InTriggerDelay;
 }
 
 void UElfAbilityBase::SetContext(UElfBattleModel* InModel, UElfBuffManager* InBuffManager, UElfTurnManager* InTurnManager, UElfBattleController* InBattleController)

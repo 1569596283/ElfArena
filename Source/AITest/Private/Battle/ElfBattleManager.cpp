@@ -203,6 +203,13 @@ void UElfBattleManager::OnForcedSwitchAllComplete()
 	ForcedSwitchSides.Reset();
 }
 
+void UElfBattleManager::OnEnterAbilitiesDone()
+{
+	// 入场特性触发完成，进入玩家决策回合
+	if (TurnManager)
+		TurnManager->StartTurn();
+}
+
 void UElfBattleManager::OnTurnSwitchRequested(EInfoSide Side, int32 NextSlotIndex)
 {
 	RecallCreature(Side, NextSlotIndex, false);
@@ -500,9 +507,32 @@ void UElfBattleManager::EnterBattle()
 	}
 
 	// 特性触发：进入战斗（双方入场，按速度先后触发）
+	// 进入入场阶段：UI 隐藏按钮/禁用输入，直到特性触发完成再开始回合
+	TurnManager->BeginEnterPhase();
+
 	if (AbilityManager)
 	{
-		AbilityManager->TriggerEnterBattle();
+		// 延迟到精灵入场动画（0.4s）播完 + UI 已创建后再触发，确保 UI 能收到播报
+		FTimerHandle AbilityTimer;
+		UWorld* World = OwnerPC ? OwnerPC->GetWorld() : nullptr;
+		if (World)
+		{
+			World->GetTimerManager().SetTimer(AbilityTimer, [this]()
+			{
+				if (AbilityManager)
+				{
+					// 特性触发序列完成后才开始回合
+					AbilityManager->OnAllAbilitiesTriggered.Clear();
+					AbilityManager->OnAllAbilitiesTriggered.AddUObject(this, &UElfBattleManager::OnEnterAbilitiesDone);
+					AbilityManager->TriggerEnterBattle();
+				}
+			}, 0.6f, false);
+		}
+	}
+	else
+	{
+		// 无特性管理器：入场阶段直接结束
+		TurnManager->StartTurn();
 	}
 
 	if (UIManager)
@@ -524,8 +554,6 @@ void UElfBattleManager::EnterBattle()
 		}
 		BattleController->BroadcastHP();
 	}
-
-	TurnManager->StartTurn();
 }
 
 void UElfBattleManager::CloseCurrentUI()

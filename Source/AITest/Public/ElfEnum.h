@@ -26,6 +26,7 @@ enum class ETurnPhase : uint8
 	None              UMETA(DisplayName = "无"),
 	BattleStart       UMETA(DisplayName = "进入战斗"),
 	SelectCreature    UMETA(DisplayName = "选择精灵"),
+	EnterPhase        UMETA(DisplayName = "精灵入场"),
 	PlayerDecision    UMETA(DisplayName = "玩家决策"),
 	WaitingForOpponent UMETA(DisplayName = "等待对手"),
 	CapturePhase       UMETA(DisplayName = "捕捉判定"),

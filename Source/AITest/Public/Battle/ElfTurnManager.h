@@ -33,6 +33,9 @@ public:
 
 	void StartTurn();
 
+	// 进入精灵入场阶段（UI 隐藏按钮/禁用输入，等待特性触发完成）
+	void BeginEnterPhase() { ChangePhase(ETurnPhase::EnterPhase); }
+
 	UFUNCTION()
 	void OnPlayerSkillSelected(int32 SlotIndex);
 

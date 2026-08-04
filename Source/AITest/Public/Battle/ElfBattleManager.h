@@ -73,6 +73,9 @@ public:
 	UFUNCTION()
 	void OnForcedSwitchAllComplete();
 
+	// 入场特性触发序列完成后，开始正式回合
+	void OnEnterAbilitiesDone();
+
 	UFUNCTION()
 	void OnTurnBattleEnded(EBattleResult Result);
 

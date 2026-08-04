@@ -44,5 +44,8 @@ struct FAbilityData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "效果列表", ToolTip = "触发时执行的一次性效果/添加增益，复用技能效果风格"))
 	TArray<FSkillEffect> Effects;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "触发延迟秒", ToolTip = ">0 时特性完成后等待该秒数再进入下一阶段（用于播动画）；<=0 不延迟"))
+	float TriggerDelay = 0.0f;
 };
 
