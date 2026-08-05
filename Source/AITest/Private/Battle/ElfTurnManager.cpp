@@ -1,6 +1,7 @@
 #include "Battle/ElfTurnManager.h"
 #include "Battle/ElfBattleAI.h"
 #include "Battle/ElfBuffManager.h"
+#include "Ability/ElfAbilityBase.h"
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
 #include "Skill/ElfSkillBase.h"
@@ -8,8 +9,17 @@
 #include "Data/ElfTypeChart.h"
 #include "Data/ElfStatCalculator.h"
 #include "Game/ElfGameInstance.h"
+#include "Event/ElfEventManager.h"
+#include "ElfGameplayTags.h"
+#include "Elf/ElfManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/ElfPlayerState.h"
+
+UElfEventManager* UElfTurnManager::GetEventManager() const
+{
+	UElfGameInstance* GI = GetGameInstance();
+	return GI ? GI->GetSubsystem<UElfEventManager>() : nullptr;
+}
 
 void UElfTurnManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 {
@@ -56,6 +66,14 @@ void UElfTurnManager::StartTurn()
 	bRemoteActionChosen = false;
 
 	ChangePhase(ETurnPhase::PlayerDecision);
+
+	// 特性触发：回合开始
+	if (UElfEventManager* EventManager = GetEventManager())
+	{
+		const FElfGameplayTags& Tags = FElfGameplayTags::Get();
+		EventManager->BroadcastEvent(Tags.Battle_Trigger_TurnStart, GetActiveCreature(EInfoSide::Self));
+		EventManager->BroadcastEvent(Tags.Battle_Trigger_TurnStart, GetActiveCreature(EInfoSide::Enemy));
+	}
 }
 
 void UElfTurnManager::OnPlayerSkillSelected(int32 SlotIndex)
@@ -67,7 +85,7 @@ void UElfTurnManager::OnPlayerSkillSelected(int32 SlotIndex)
 
 	UElfSkillBase* SkillInstance = GetActiveSkillInstance(EInfoSide::Self, SlotIndex);
 	if (!SkillInstance) return;
-	if (BuffManager->GetModifiedEnergyCost(EInfoSide::Self, SkillInstance->GetInstanceEnergyCost()) > Creature->CurrentEnergy) return;
+	if (GetSkillEnergyCost(EInfoSide::Self, SkillInstance) > Creature->CurrentEnergy) return;
 	if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Defense && Creature->LastUsedSkillType == ESkillType::Defense) return;
 
 	PlayerChosenSlot = SlotIndex;
@@ -94,7 +112,7 @@ void UElfTurnManager::OnPlayerDefaultSkillSelected(int32 SlotIndex)
 
 	UElfSkillBase* SkillInstance = GetActiveDefaultSkillInstance(EInfoSide::Self, SlotIndex);
 	if (!SkillInstance) return;
-	if (BuffManager->GetModifiedEnergyCost(EInfoSide::Self, SkillInstance->GetInstanceEnergyCost()) > Creature->CurrentEnergy) return;
+	if (GetSkillEnergyCost(EInfoSide::Self, SkillInstance) > Creature->CurrentEnergy) return;
 	if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Defense && Creature->LastUsedSkillType == ESkillType::Defense) return;
 
 	PlayerDefaultSlotIndex = SlotIndex;
@@ -286,8 +304,14 @@ void UElfTurnManager::ResolveActions()
 		? FTurnAction{ EInfoSide::Enemy, EnemyDefaultSlotIndex, true }
 		: FTurnAction{ EInfoSide::Enemy, EnemyChosenSlot, false };
 
-	int32 PlayerPriority = PlayerChosenSlot >= 0 ? GetSkillPriorityFor(EInfoSide::Self, PlayerChosenSlot) : -99;
-	int32 EnemyPriority = EnemyChosenSlot >= 0 ? GetSkillPriorityFor(EInfoSide::Enemy, EnemyChosenSlot) : -99;
+	// 优先级按行动取技能实例（默认技能用默认实例），避免默认技能读错装备槽位
+	int32 PlayerPriority = -99;
+	if (UElfSkillBase* Inst = GetActionSkillInstance(PlayerAction))
+		PlayerPriority = Inst->GetSkillDataRef().Priority;
+
+	int32 EnemyPriority = -99;
+	if (UElfSkillBase* Inst = GetActionSkillInstance(EnemyAction))
+		EnemyPriority = Inst->GetSkillDataRef().Priority;
 
 	if (PlayerPriority > EnemyPriority)
 	{
@@ -365,6 +389,7 @@ void UElfTurnManager::OnExecutionTimer()
 	B = ActionQueue[1];
 	if (Counter != ECounterState::None)
 	{
+		// 应对：提示顺序 被应对→应对（A,B），生效顺序 应对→被应对（B,A）
 		DisplayActions = { A, B };
 		ExecuteActions = { B, A };
 	}
@@ -418,6 +443,7 @@ void UElfTurnManager::ProcessNextAction()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
+	// 逐行动作：提示顺序用 DisplayActions（应对时先弹被应对），生效顺序用 ExecuteActions（应对先生效）
 	if (bInDisplayPhase)
 	{
 		if (CurrentActionIndex < DisplayActions.Num())
@@ -425,50 +451,65 @@ void UElfTurnManager::ProcessNextAction()
 			const FTurnAction& Action = DisplayActions[CurrentActionIndex];
 			FName SkillRowName = GetActionSkillRowName(Action);
 			bool bIsCounter = false;
-			if (DisplayActions.Num() > 1 && ExecuteActions.Num() > 1 && ExecuteActions[0].Side != DisplayActions[0].Side)
+			if (DisplayActions.Num() > 1)
 			{
-				bIsCounter = (CurrentActionIndex == 1);
+				const FTurnAction& Other = DisplayActions[1 - CurrentActionIndex];
+				bIsCounter = IsCounteredBy(Other, Action);
 			}
 			if (BattleController)
 				BattleController->OnSkillDisplayStarted.Broadcast(Action.Side, SkillRowName, bIsCounter);
 
-			CurrentActionIndex++;
+			// 先手攻击特性：基于首个生效行动（应对时是应对方）
+			if (CurrentActionIndex == 0 && ExecuteActions.Num() > 0)
+			{
+				const FTurnAction& FirstExecute = ExecuteActions[0];
+				UElfSkillBase* FirstSkill = FirstExecute.bIsDefault
+					? GetActiveDefaultSkillInstance(FirstExecute.Side, FirstExecute.SlotIndex)
+					: GetActiveSkillInstance(FirstExecute.Side, FirstExecute.SlotIndex);
+				if (FirstSkill && FirstSkill->GetSkillDataRef().SkillType == ESkillType::Attack)
+				{
+					if (UElfEventManager* EventManager = GetEventManager())
+					{
+						EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_FirstAttack, GetActiveCreature(FirstExecute.Side));
+					}
+				}
+			}
+
+			bInDisplayPhase = false;
+			bInExecutePhase = true;
 			World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 1.5f, false);
 		}
 		else
 		{
 			if (BattleController)
+			{
 				BattleController->OnAllSkillsDisplayed.Broadcast();
-
-			bInDisplayPhase = false;
-			CurrentActionIndex = 0;
-			bInExecutePhase = true;
-			World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 0.5f, false);
+				BattleController->OnActionPhaseEnded.Broadcast();
+			}
+			ActionQueue.Empty();
+			EndTurn();
 		}
 		return;
 	}
 
 	if (bInExecutePhase)
 	{
-		if (CurrentActionIndex < ExecuteActions.Num())
+		const FTurnAction& Action = ExecuteActions[CurrentActionIndex];
+		CurrentActionIndex++;
+		ExecuteTurnAction(Action);
+		if (CurrentPhase == ETurnPhase::BattleEnd) return;
+
+		if (bForceSwitchPending)
 		{
-			const FTurnAction& Action = ExecuteActions[CurrentActionIndex];
-			CurrentActionIndex++;
-			ExecuteTurnAction(Action);
-			if (CurrentPhase == ETurnPhase::BattleEnd) return;
-			if (!bForceSwitchPending)
-			{
-				World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 1.0f, false);
-			}
-		}
-		else
-		{
+			// 强制换将：暂停，换将完成后回到显示阶段展示下一个技能
 			bInExecutePhase = false;
-			if (BattleController)
-				BattleController->OnActionPhaseEnded.Broadcast();
-			ActionQueue.Empty();
-			EndTurn();
+			bInDisplayPhase = true;
+			return;
 		}
+
+		bInExecutePhase = false;
+		bInDisplayPhase = true;
+		World->GetTimerManager().SetTimer(ExecutionTimer, this, &UElfTurnManager::ProcessNextAction, 1.0f, false);
 		return;
 	}
 }
@@ -495,10 +536,13 @@ void UElfTurnManager::ExecuteTurnAction(const FTurnAction& Action)
 		: GetActiveSkillInstance(Action.Side, Action.SlotIndex);
 	if (!SkillInstance) return;
 
-	int32 Cost = FMath::Max(0, BuffManager->GetModifiedEnergyCost(Action.Side, SkillInstance->GetInstanceEnergyCost()));
+	int32 Cost = GetSkillEnergyCost(Action.Side, SkillInstance);
 	Actor->CurrentEnergy = FMath::Max(0, Actor->CurrentEnergy - Cost);
 	SkillInstance->OnSkillUsed();
 	Actor->LastUsedSkillType = SkillInstance->GetSkillDataRef().SkillType;
+
+	// 记录技能属性（供 UseElementSkill 特性匹配）
+	Actor->LastSkillElement = SkillInstance->GetSkillDataRef().ElementType;
 
 	if (Action.Side == EInfoSide::Self)
 		BattleController->OnSelfCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
@@ -527,8 +571,18 @@ void UElfTurnManager::ExecuteTurnAction(const FTurnAction& Action)
 	else if (SkillInstance->GetSkillDataRef().SkillType == ESkillType::Status)
 		ApplyStatusEffects(Action, SkillInstance);
 
+	// 使用元素技能特性：技能结算完成后触发（提示晚于技能生效，如 回春/烈焰双攻/水脉节能）
+	if (UElfEventManager* EventManager = GetEventManager())
+	{
+		EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_UseElementSkill, Actor);
+	}
+
 	EInfoSide DeathSide = (Action.Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
 	CheckDeath(DeathSide);
+	if (CurrentPhase == ETurnPhase::BattleEnd) return;
+
+	// 受击方反击/反伤可能打死的攻击方
+	CheckDeath(Action.Side);
 	if (CurrentPhase == ETurnPhase::BattleEnd) return;
 
 	if (Action.Side == EInfoSide::Self && Actor->bWishActive)
@@ -552,8 +606,8 @@ UElfTurnManager::ECounterState UElfTurnManager::DetermineCounter(const FTurnActi
 
 bool UElfTurnManager::IsCounteredBy(const FTurnAction& Target, const FTurnAction& Counter) const
 {
-	UElfSkillBase* TargetSkill = GetActiveSkillInstance(Target.Side, Target.SlotIndex);
-	UElfSkillBase* CounterSkill = GetActiveSkillInstance(Counter.Side, Counter.SlotIndex);
+	UElfSkillBase* TargetSkill = GetActionSkillInstance(Target);
+	UElfSkillBase* CounterSkill = GetActionSkillInstance(Counter);
 	if (!TargetSkill || !CounterSkill) return false;
 	if (!CounterSkill->GetSkillDataRef().Counter) return false;
 
@@ -571,7 +625,7 @@ bool UElfTurnManager::IsCounteredBy(const FTurnAction& Target, const FTurnAction
 
 float UElfTurnManager::GetCounterModifier(const FTurnAction& Counter) const
 {
-	UElfSkillBase* Skill = GetActiveSkillInstance(Counter.Side, Counter.SlotIndex);
+	UElfSkillBase* Skill = GetActionSkillInstance(Counter);
 	if (!Skill || !Skill->GetSkillDataRef().Counter) return 1.0f;
 
 	ESkillType Type = Skill->GetSkillDataRef().SkillType;
@@ -634,28 +688,17 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 	int32 Damage = AttackSkill->CalculateInstanceDamage(ModifiedAttacker, ModifiedTarget);
 	if (Damage <= 0) return;
 
-	float PowerMod = 1.0f;
-	TArray<const FActiveBuff*> AttackBuffs;
-	BuffManager->CollectActiveBuffs(AttackerSide, AttackBuffs);
-	for (const FActiveBuff* Buff : AttackBuffs)
-	{
-		if (Buff->EffectID == EEffectID::ModifyEnergyCostAndPower && Buff->Params.IsValidIndex(1))
-		{
-			PowerMod += Buff->Params[1] * Buff->StackCount;
-		}
-	}
-	Damage = FMath::Max(1, FMath::RoundToInt(Damage * PowerMod));
-
-	// 独立乘区：直接伤害增益/减免（所有直接增益相乘）
-	Damage = FMath::Max(1, FMath::RoundToInt(Damage * BuffManager->GetDirectDamageMultiplier(AttackerSide, TargetSide)));
+	// 攻击方总伤害增幅（buff 威力 + 直接伤害乘区 + 攻击方特性增伤）
+	Damage = FMath::Max(1, FMath::RoundToInt(Damage * GetAttackerDamageMultiplier(AttackerSide, TargetSide, SkillInstance->GetSkillDataRef())));
 
 	UElfGameInstance* GI = GetGameInstance();
+	float TypeMult = 1.0f;
 	if (GI)
 	{
 		FElfBaseData TargetBaseData;
 		if (GI->GetElfBaseData(Target->CreatureRowName, TargetBaseData))
 		{
-			float TypeMult = ElfTypeChart::GetMultiplier(
+			TypeMult = ElfTypeChart::GetMultiplier(
 				SkillInstance->GetSkillDataRef().ElementType,
 				TargetBaseData.Type1,
 				TargetBaseData.Type2,
@@ -668,6 +711,15 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 
 	Target->CurrentHP = FMath::Max(0, Target->CurrentHP - Damage);
 
+	// 特性触发：受到伤害（每段）+ 克制伤害（每段一次）
+	if (UElfEventManager* EventManager = GetEventManager())
+	{
+		const FElfGameplayTags& Tags = FElfGameplayTags::Get();
+		EventManager->BroadcastEvent(Tags.Battle_Trigger_TakeDamage, Target);
+		if (TypeMult > 1.0f)
+			EventManager->BroadcastEvent(Tags.Battle_Trigger_DealSuperEffective, Attacker);
+	}
+
 	if (TargetSide == EInfoSide::Self)
 	{
 		BattleController->OnSelfCreatureHPChanged.Broadcast(Target->CurrentHP, TargetStats->MaxHP);
@@ -676,6 +728,81 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 	{
 		BattleController->OnEnemyCreatureHPChanged.Broadcast(Target->CurrentHP, TargetStats->MaxHP);
 	}
+}
+
+float UElfTurnManager::GetAttackerDamageMultiplier(EInfoSide AttackerSide, EInfoSide TargetSide, const FSkillData& SkillData) const
+{
+	float Multiplier = 1.0f;
+
+	// 1. buff 威力修正（ModifyEnergyCostAndPower）
+	TArray<const FActiveBuff*> AttackBuffs;
+	if (BuffManager)
+		BuffManager->CollectActiveBuffs(AttackerSide, AttackBuffs);
+	float PowerMod = 1.0f;
+	for (const FActiveBuff* Buff : AttackBuffs)
+	{
+		if (Buff->EffectID == EEffectID::ModifyEnergyCostAndPower && Buff->Params.IsValidIndex(0))
+		{
+			PowerMod += Buff->Params[0] / 100.0f * Buff->StackCount;
+		}
+	}
+	Multiplier *= PowerMod;
+
+	// 2. 直接伤害乘区（增益 × 减免，含条件数量）
+	if (BuffManager)
+		Multiplier *= BuffManager->GetDirectDamageMultiplier(AttackerSide, TargetSide);
+
+	// 3. 攻击方特性增伤（如 能耗1技能威力+50%）
+	if (BattleModel)
+	{
+		FBattleSideData& SideData = (AttackerSide == EInfoSide::Self) ? BattleModel->PlayerSide : BattleModel->EnemySide;
+		if (SideData.AbilityInstances.IsValidIndex(SideData.ActiveIndex))
+		{
+			if (UElfAbilityBase* Ability = SideData.AbilityInstances[SideData.ActiveIndex])
+				Multiplier *= Ability->ModifySkillPower(AttackerSide, SkillData);
+		}
+	}
+
+	return Multiplier;
+}
+
+int32 UElfTurnManager::GetSkillEnergyCost(EInfoSide Side, UElfSkillBase* SkillInstance) const
+{
+	if (!SkillInstance) return 0;
+	const FSkillData& SkillData = SkillInstance->GetSkillDataRef();
+	int32 Cost = BuffManager ? BuffManager->GetModifiedEnergyCost(Side, SkillInstance->GetInstanceEnergyCost()) : SkillInstance->GetInstanceEnergyCost();
+
+	// 在场精灵特性修正能耗（如 水系：防御技能能耗-2）
+	if (BattleModel)
+	{
+		FBattleSideData& SideData = (Side == EInfoSide::Self) ? BattleModel->PlayerSide : BattleModel->EnemySide;
+		if (SideData.AbilityInstances.IsValidIndex(SideData.ActiveIndex))
+		{
+			if (UElfAbilityBase* Ability = SideData.AbilityInstances[SideData.ActiveIndex])
+			{
+				int32 Before = Cost;
+				Ability->ModifyEnergyCost(Side, SkillData, Cost);
+				UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d SkillType=%d Base=%d Ability=%s Cost %d->%d"), (int32)Side, (int32)SkillData.SkillType, SkillInstance->GetInstanceEnergyCost(), *Ability->GetClass()->GetName(), Before, Cost);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d 特性实例为空"), (int32)Side);
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d AbilityInstances 无效 ActiveIndex=%d"), (int32)Side, SideData.ActiveIndex);
+		}
+	}
+	return FMath::Max(0, Cost);
+}
+
+int32 UElfTurnManager::GetSkillEnergyCost(EInfoSide Side, int32 SlotIndex, bool bIsDefault) const
+{
+	UElfSkillBase* Inst = bIsDefault
+		? GetActiveDefaultSkillInstance(Side, SlotIndex)
+		: GetActiveSkillInstance(Side, SlotIndex);
+	return GetSkillEnergyCost(Side, Inst);
 }
 
 void UElfTurnManager::ApplyStatusEffects(const FTurnAction& Action, UElfSkillBase* SkillInstance)
@@ -711,6 +838,12 @@ void UElfTurnManager::ApplyStatusEffects(const FTurnAction& Action, UElfSkillBas
 				BattleController->OnSelfCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
 			else
 				BattleController->OnEnemyCreatureEnergyChanged.Broadcast(Actor->CurrentEnergy);
+
+			// 特性触发：回复能量
+			if (UElfEventManager* EventManager = GetEventManager())
+			{
+				EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_RestoreEnergy, Actor);
+			}
 			break;
 		}
 		case EEffectType::AddBuff:
@@ -1047,8 +1180,7 @@ void UElfTurnManager::TryExecuteSwiftSkills()
 
 				// 检查能量是否足够
 				EInfoSide SideEnum = (s == 0) ? EInfoSide::Self : EInfoSide::Enemy;
-				int32 Cost = SkillData.EnergyCost;
-				if (BuffManager) Cost = BuffManager->GetModifiedEnergyCost(SideEnum, Cost);
+				int32 Cost = GetSkillEnergyCost(SideEnum, GetActiveSkillInstance(SideEnum, j));
 				if (Creature->CurrentEnergy >= Cost)
 				{
 					// 记录 EffectTarget，但同一个技能只有一个 Swift 效果
@@ -1088,8 +1220,7 @@ void UElfTurnManager::ExecuteSwiftSkill(EInfoSide Side, int32 SkillSlotIndex)
 	if (!SkillInstance) return;
 
 	// 扣能量
-	int32 Cost = SkillInstance->GetInstanceEnergyCost();
-	if (BuffManager) Cost = BuffManager->GetModifiedEnergyCost(Side, Cost);
+	int32 Cost = GetSkillEnergyCost(Side, SkillInstance);
 	Actor->CurrentEnergy = FMath::Max(0, Actor->CurrentEnergy - Cost);
 	SkillInstance->OnSkillUsed();
 	Actor->LastUsedSkillType = SkillInstance->GetSkillDataRef().SkillType;
@@ -1128,6 +1259,8 @@ void UElfTurnManager::ExecuteSwiftSkill(EInfoSide Side, int32 SkillSlotIndex)
 
 	// 死亡判定
 	CheckDeath(TargetSide);
+	if (CurrentPhase == ETurnPhase::BattleEnd) return;
+	CheckDeath(Side); // 迅捷攻击的受击方反击可能打死的迅捷使用者
 }
 
 void UElfTurnManager::OnSwiftSkillDone()
@@ -1145,6 +1278,14 @@ void UElfTurnManager::OnSwiftSkillDone()
 
 void UElfTurnManager::EndTurn()
 {
+	// 特性触发：回合结束
+	if (UElfEventManager* EventManager = GetEventManager())
+	{
+		const FElfGameplayTags& Tags = FElfGameplayTags::Get();
+		EventManager->BroadcastEvent(Tags.Battle_Trigger_TurnEnd, GetActiveCreature(EInfoSide::Self));
+		EventManager->BroadcastEvent(Tags.Battle_Trigger_TurnEnd, GetActiveCreature(EInfoSide::Enemy));
+	}
+
 	BuffManager->ProcessTurnEndEffects(EInfoSide::Self);
 	CheckDeath(EInfoSide::Self);
 	BuffManager->ProcessTurnEndEffects(EInfoSide::Enemy);
@@ -1161,6 +1302,12 @@ void UElfTurnManager::CheckDeath(EInfoSide Side)
 {
 	FElfCreatureInstance* Creature = GetActiveCreature(Side);
 	if (!Creature || Creature->CurrentHP > 0) return;
+
+	// 特性触发：死亡（在胜负结算/换将前）
+	if (UElfEventManager* EventManager = GetEventManager())
+	{
+		EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_OnDeath, Creature);
+	}
 
 	if (Side == EInfoSide::Self) PlayerFaintCount++;
 	else EnemyFaintCount++;
@@ -1278,6 +1425,13 @@ UElfSkillBase* UElfTurnManager::GetActiveDefaultSkillInstance(EInfoSide Side, in
 	if (!BattleModel) return nullptr;
 	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
 	return SideData ? SideData->GetActiveDefaultSkillInstance(SlotIndex) : nullptr;
+}
+
+UElfSkillBase* UElfTurnManager::GetActionSkillInstance(const FTurnAction& Action) const
+{
+	return Action.bIsDefault
+		? GetActiveDefaultSkillInstance(Action.Side, Action.SlotIndex)
+		: GetActiveSkillInstance(Action.Side, Action.SlotIndex);
 }
 
 bool UElfTurnManager::HasAliveCreatures(EInfoSide Side) const

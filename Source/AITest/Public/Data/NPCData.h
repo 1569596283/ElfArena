@@ -39,8 +39,8 @@ struct FNPCData : public FTableRowBase
 	GENERATED_BODY()
 
 	// NPC 名称（显示用）
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC信息")
-	FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC信息", meta = (DisplayName = "显示名称"))
+	FText DisplayName;
 
 	// 头像 ID（对应 AvatarDataTable 行名）
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC信息")

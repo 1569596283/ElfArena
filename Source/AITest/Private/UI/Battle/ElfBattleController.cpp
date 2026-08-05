@@ -138,6 +138,10 @@ int32 UElfBattleController::GetDefaultSkillPower(int32 SlotIndex) const
 
 int32 UElfBattleController::GetDefaultEnergyCost(int32 SlotIndex) const
 {
+	// 走 TurnManager 修正版（含 buff/特性能耗修正）
+	if (TurnManager)
+		return TurnManager->GetSkillEnergyCost(EInfoSide::Self, SlotIndex, true);
+
 	if (!BattleModel) return 0;
 	FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
 	if (!Creature || !Creature->EquippedSkills.IsValidIndex(SlotIndex)) return 0;
@@ -157,6 +161,10 @@ void UElfBattleController::ApplyCounterEffect(int32 SlotIndex)
 
 int32 UElfBattleController::GetSkillEnergyCost(int32 SlotIndex) const
 {
+	// 走 TurnManager 修正版（含 buff/特性能耗修正，如 水御：防御技能能耗-2）
+	if (TurnManager)
+		return TurnManager->GetSkillEnergyCost(EInfoSide::Self, SlotIndex, false);
+
 	if (!BattleModel) return 0;
 	FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
 	if (!Creature || !Creature->EquippedSkills.IsValidIndex(SlotIndex)) return 0;
@@ -259,6 +267,24 @@ FElfCreatureInstance UElfBattleController::GetEnemyCreature(int32 Index) const
 		return BattleModel->EnemySide.Team[Index];
 	}
 	return FElfCreatureInstance();
+}
+
+int32 UElfBattleController::GetCreatureMaxHP(EInfoSide Side, int32 Index) const
+{
+	if (!BattleModel) return 0;
+	const FBattleSideData& SideData = (Side == EInfoSide::Self) ? BattleModel->PlayerSide : BattleModel->EnemySide;
+	if (SideData.CalculatedStats.IsValidIndex(Index))
+		return SideData.CalculatedStats[Index].MaxHP;
+	return 0;
+}
+
+int32 UElfBattleController::GetCreatureCurrentHP(EInfoSide Side, int32 Index) const
+{
+	if (!BattleModel) return 0;
+	const FBattleSideData& SideData = (Side == EInfoSide::Self) ? BattleModel->PlayerSide : BattleModel->EnemySide;
+	if (SideData.Team.IsValidIndex(Index))
+		return SideData.Team[Index].CurrentHP;
+	return 0;
 }
 
 bool UElfBattleController::GetElfBaseData(FName RowName, FElfBaseData& OutData) const

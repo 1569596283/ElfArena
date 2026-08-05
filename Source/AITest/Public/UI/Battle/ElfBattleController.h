@@ -198,6 +198,12 @@ public:
 	FElfCreatureInstance GetEnemyCreature(int32 Index) const;
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetCreatureMaxHP(EInfoSide Side, int32 Index) const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
+	int32 GetCreatureCurrentHP(EInfoSide Side, int32 Index) const;
+
+	UFUNCTION(BlueprintPure, Category = "战斗")
 	bool GetElfBaseData(FName RowName, FElfBaseData& OutData) const;
 
 	UFUNCTION(BlueprintPure, Category = "战斗")

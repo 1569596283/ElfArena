@@ -1,0 +1,2994 @@
+[
+	{
+		"Name": "Default",
+		"DisplayName": "NSLOCTEXT(\"[073C0B366FC6284B5873248764CF672D]\", \"0F6FA0A3472CB1FAC1A4439B09412367\", \"默认精灵\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Normal",
+		"Type2": "None",
+		"Type3": "Normal",
+		"WorldBlueprint": "/Game/Blueprint/Elf/Elf_1/BP_Elf_World_1.BP_Elf_World_1_C",
+		"BattleBlueprint": "/Game/Blueprint/Elf/Elf_1/BP_Elf_Battle_1.BP_Elf_Battle_1_C",
+		"BaseHP": 100,
+		"BaseATK": 100,
+		"BaseMATK": 100,
+		"BaseDEF": 100,
+		"BaseMDEF": 100,
+		"BaseSPD": 100,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FirstStrike",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "1",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"1_DisplayName\", \"幽影\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 100,
+		"BaseATK": 80,
+		"BaseMATK": 65,
+		"BaseDEF": 65,
+		"BaseMDEF": 55,
+		"BaseSPD": 70,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "2"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Intimidate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "2",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"2_DisplayName\", \"暗夜\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 110,
+		"BaseATK": 95,
+		"BaseMATK": 80,
+		"BaseDEF": 75,
+		"BaseMDEF": 65,
+		"BaseSPD": 85,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "3"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Intimidate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "3",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"3_DisplayName\", \"深渊\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 120,
+		"BaseMATK": 95,
+		"BaseDEF": 85,
+		"BaseMDEF": 75,
+		"BaseSPD": 105,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12202",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Intimidate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "11",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"11_DisplayName\", \"疾风\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Wind",
+		"Type2": "None",
+		"Type3": "Wind",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 100,
+		"BaseATK": 85,
+		"BaseMATK": 65,
+		"BaseDEF": 70,
+		"BaseMDEF": 65,
+		"BaseSPD": 100,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "12"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FirstStrike",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "12",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"12_DisplayName\", \"风暴\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Wind",
+		"Type2": "None",
+		"Type3": "Wind",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 110,
+		"BaseATK": 110,
+		"BaseMATK": 85,
+		"BaseDEF": 80,
+		"BaseMDEF": 80,
+		"BaseSPD": 125,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FirstStrike",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "21",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"21_DisplayName\", \"焰苗\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Fire",
+		"Type2": "None",
+		"Type3": "Fire",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 90,
+		"BaseATK": 85,
+		"BaseMATK": 80,
+		"BaseDEF": 60,
+		"BaseMDEF": 60,
+		"BaseSPD": 70,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "22"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FireBoost",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "22",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"22_DisplayName\", \"烈焰\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Fire",
+		"Type2": "None",
+		"Type3": "Fire",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 105,
+		"BaseATK": 100,
+		"BaseMATK": 95,
+		"BaseDEF": 70,
+		"BaseMDEF": 70,
+		"BaseSPD": 85,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "23"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FireBoost",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "23",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"23_DisplayName\", \"炼狱\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Fire",
+		"Type2": "None",
+		"Type3": "Fire",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 125,
+		"BaseMATK": 115,
+		"BaseDEF": 80,
+		"BaseMDEF": 80,
+		"BaseSPD": 90,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "FireBoost",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "31",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"31_DisplayName\", \"藤芽\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Grass",
+		"Type2": "None",
+		"Type3": "Grass",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 110,
+		"BaseATK": 70,
+		"BaseMATK": 85,
+		"BaseDEF": 80,
+		"BaseMDEF": 80,
+		"BaseSPD": 60,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "32"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "GrassHeal",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "32",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"32_DisplayName\", \"森灵\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Grass",
+		"Type2": "None",
+		"Type3": "Grass",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 120,
+		"BaseATK": 95,
+		"BaseMATK": 110,
+		"BaseDEF": 100,
+		"BaseMDEF": 100,
+		"BaseSPD": 65,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "GrassHeal",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "41",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"41_DisplayName\", \"潮汐\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Water",
+		"Type2": "None",
+		"Type3": "Water",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 95,
+		"BaseMATK": 105,
+		"BaseDEF": 95,
+		"BaseMDEF": 105,
+		"BaseSPD": 70,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "WaterCost",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "51",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"51_DisplayName\", \"幽爪\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 95,
+		"BaseATK": 85,
+		"BaseMATK": 60,
+		"BaseDEF": 60,
+		"BaseMDEF": 55,
+		"BaseSPD": 70,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "52"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "EnergyDrain",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "52",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"52_DisplayName\", \"暗獠\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 110,
+		"BaseATK": 100,
+		"BaseMATK": 70,
+		"BaseDEF": 70,
+		"BaseMDEF": 65,
+		"BaseSPD": 85,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "53"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "EnergyDrain",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "53",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"53_DisplayName\", \"冥主\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "None",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 120,
+		"BaseMATK": 85,
+		"BaseDEF": 80,
+		"BaseMDEF": 75,
+		"BaseSPD": 110,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "EnergyDrain",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "61",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"61_DisplayName\", \"石灵\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Earth",
+		"Type2": "None",
+		"Type3": "Earth",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 100,
+		"BaseATK": 70,
+		"BaseMATK": 55,
+		"BaseDEF": 80,
+		"BaseMDEF": 70,
+		"BaseSPD": 45,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "62"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Retaliate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "62",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"62_DisplayName\", \"岩卫\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Earth",
+		"Type2": "None",
+		"Type3": "Earth",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 85,
+		"BaseMATK": 65,
+		"BaseDEF": 95,
+		"BaseMDEF": 80,
+		"BaseSPD": 55,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "63"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Retaliate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "63",
+		"DisplayName": "NSLOCTEXT(\"DT_ElfBase [073C0B366FC6284B5873248764CF672D]\", \"63_DisplayName\", \"山神\")",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Earth",
+		"Type2": "None",
+		"Type3": "Earth",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 120,
+		"BaseATK": 100,
+		"BaseMATK": 80,
+		"BaseDEF": 115,
+		"BaseMDEF": 90,
+		"BaseSPD": 70,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "Retaliate",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "71",
+		"DisplayName": "铁拳",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Normal",
+		"Type2": "None",
+		"Type3": "Normal",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 100,
+		"BaseATK": 85,
+		"BaseMATK": 60,
+		"BaseDEF": 65,
+		"BaseMDEF": 60,
+		"BaseSPD": 55,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10210",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10109",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10407",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10206",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10008",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "72"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "LowCostPower",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "72",
+		"DisplayName": "钢拳",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Normal",
+		"Type2": "None",
+		"Type3": "Normal",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 110,
+		"BaseATK": 100,
+		"BaseMATK": 75,
+		"BaseDEF": 75,
+		"BaseMDEF": 70,
+		"BaseSPD": 65,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10001",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10214",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10411",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10008",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10210",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10206",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10112",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10405",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "73"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "LowCostPower",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "73",
+		"DisplayName": "拳王",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Normal",
+		"Type2": "None",
+		"Type3": "Normal",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 115,
+		"BaseMATK": 90,
+		"BaseDEF": 85,
+		"BaseMDEF": 80,
+		"BaseSPD": 80,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10214",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10109",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10001",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10008",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10407",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10210",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10206",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10112",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10411",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10405",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "LowCostPower",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "81",
+		"DisplayName": "露滴",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Water",
+		"Type2": "None",
+		"Type3": "Water",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 105,
+		"BaseATK": 60,
+		"BaseMATK": 80,
+		"BaseDEF": 70,
+		"BaseMDEF": 75,
+		"BaseSPD": 55,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "82"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "WaterDefenseDiscount",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "82",
+		"DisplayName": "激流",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Water",
+		"Type2": "None",
+		"Type3": "Water",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 70,
+		"BaseMATK": 95,
+		"BaseDEF": 80,
+		"BaseMDEF": 85,
+		"BaseSPD": 65,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "83"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "WaterDefenseDiscount",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "83",
+		"DisplayName": "海皇",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Water",
+		"Type2": "None",
+		"Type3": "Water",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 120,
+		"BaseATK": 85,
+		"BaseMATK": 110,
+		"BaseDEF": 90,
+		"BaseMDEF": 95,
+		"BaseSPD": 75,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16108",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "WaterDefenseDiscount",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "91",
+		"DisplayName": "影藤",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "Grass",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 100,
+		"BaseATK": 75,
+		"BaseMATK": 75,
+		"BaseDEF": 65,
+		"BaseMDEF": 65,
+		"BaseSPD": 55,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13209",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "11101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19101",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "92"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "DuskDrain",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "92",
+		"DisplayName": "冥藤",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "Grass",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 115,
+		"BaseATK": 90,
+		"BaseMATK": 90,
+		"BaseDEF": 75,
+		"BaseMDEF": 75,
+		"BaseSPD": 65,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18303",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18205",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "14108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "12108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "93"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "DuskDrain",
+		"CaptureDifficulty": 1
+	},
+	{
+		"Name": "93",
+		"DisplayName": "暮主",
+		"Description": "",
+		"Icon": "None",
+		"Type1": "Dark",
+		"Type2": "Grass",
+		"Type3": "Dark",
+		"WorldBlueprint": "None",
+		"BattleBlueprint": "None",
+		"BaseHP": 120,
+		"BaseATK": 105,
+		"BaseMATK": 105,
+		"BaseDEF": 85,
+		"BaseMDEF": 85,
+		"BaseSPD": 75,
+		"LearnableSkills": [
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18111",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18007",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13406",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13404",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "18410",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "13213",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10102",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "30000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10304",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "20000",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "10203",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15202",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "17212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "19212",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15101",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "15108",
+				"bNeedSkillStone": false
+			},
+			{
+				"UnlockLevel": 0,
+				"SkillID": "16212",
+				"bNeedSkillStone": false
+			}
+		],
+		"EvolutionTarget": {
+			"DataTable": "None",
+			"RowName": "None"
+		},
+		"EvolutionConditions": [],
+		"AbilityID": "DuskDrain",
+		"CaptureDifficulty": 1
+	}
+]

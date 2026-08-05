@@ -11,6 +11,7 @@ class UElfBattleModel;
 class UElfBuffManager;
 class UElfTurnManager;
 struct FElfCreatureInstance;
+enum class EInfoSide : uint8;
 
 UCLASS(BlueprintType)
 class AITEST_API UElfAbilityBase : public UObject
@@ -21,6 +22,9 @@ public:
 	// 配置特性：AbilityID + 触发时机 + 效果列表 + 延迟
 	UFUNCTION(BlueprintCallable, Category = "特性")
 	virtual void Init(const FName& InAbilityID, const FGameplayTag& InTrigger, const TArray<FSkillEffect>& InEffects, float InTriggerDelay = 0.0f);
+
+	// 配置触发条件（TriggerChance / HPThreshold / TargetElement / EnergyCostCondition，来自 FAbilityData）
+	void SetTriggerConditions(float InTriggerChance, float InHPThreshold, EElfType InTargetElement, int32 InEnergyCostCondition = -1);
 
 	// 注入本局执行上下文（AbilityManager 初始化时调用）
 	void SetContext(UElfBattleModel* InModel, UElfBuffManager* InBuffManager, UElfTurnManager* InTurnManager, UElfBattleController* InBattleController);
@@ -42,6 +46,12 @@ public:
 
 	// 执行特性效果（默认遍历 Effects 执行通用效果，子类可重写）
 	virtual void TriggerAbility(const FElfCreatureInstance* Creature);
+
+	// 技能威力增幅倍率（伤害计算时由攻击方特性调用；子类/配置可重写，如"能耗1技能威力+50%"）
+	virtual float ModifySkillPower(EInfoSide Side, const FSkillData& SkillData) const;
+
+	// 技能能耗修正（子类可重写，如 水系：防御技能能耗-2）
+	virtual void ModifyEnergyCost(EInfoSide Side, const FSkillData& SkillData, int32& InOutCost) const;
 
 	// 定位精灵所属侧（0=己方, 1=敌方）；找不到返回 -1
 	int32 GetCreatureSide(const FElfCreatureInstance* Creature) const;
@@ -73,4 +83,28 @@ protected:
 	// 触发延迟秒数（来自 FAbilityData.TriggerDelay）
 	UPROPERTY()
 	float TriggerDelay = 0.0f;
+
+	// 触发概率（0~1，1=必定触发）
+	UPROPERTY()
+	float TriggerChance = 1.0f;
+
+	// 血量阈值（0~1，低于此比例触发；0=不启用）
+	UPROPERTY()
+	float HPThreshold = 0.0f;
+
+	// 指定属性（UseElementSkill 触发时匹配的技能属性）
+	UPROPERTY()
+	EElfType TargetElement = EElfType::None;
+
+	// 能耗条件（>=0 时仅该能耗的技能触发增伤，-1=不启用）
+	UPROPERTY()
+	int32 EnergyCostCondition = -1;
+
+	// 不弹提示（被动特性用）
+	UPROPERTY()
+	bool bNoPrompt = false;
+
+public:
+	bool IsNoPrompt() const { return bNoPrompt; }
+	void SetNoPrompt(bool InNoPrompt) { bNoPrompt = InNoPrompt; }
 };

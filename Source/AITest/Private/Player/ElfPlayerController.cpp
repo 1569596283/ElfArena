@@ -8,6 +8,9 @@
 #include "Game/ElfSaveGame.h"
 #include "Game/ElfGameInstance.h"
 #include "Data/NPCData.h"
+#include "Data/ElfBaseData.h"
+#include "Data/ElfSkillData.h"
+#include "UI/ElfGMWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/ElfPlayerState.h"
 #include "Elf/ElfManager.h"
@@ -57,6 +60,9 @@ void AElfPlayerController::BeginPlay()
 
 	UIManager = NewObject<UUIManager>(this);
 	UIManager->Init(this);
+
+	// GM 面板进入游戏时自动打开
+	OpenGM();
 }
 
 void AElfPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -141,6 +147,168 @@ void AElfPlayerController::JumpCompleted()
 	}
 }
 
+void AElfPlayerController::OnGMWidgetClosed()
+{
+	CloseGMWidget();
+}
+
+void AElfPlayerController::CloseGMWidget()
+{
+	if (GMWidget)
+	{
+		GMWidget->RemoveFromParent();
+		GMWidget = nullptr;
+	}
+	bShowMouseCursor = false;
+	SetInputMode(FInputModeGameOnly());
+}
+
+void AElfPlayerController::OpenGM()
+{
+	// 只有本地玩家控制器才能创建/拥有 UI（避免服务器上为远程玩家控制器建 Widget 报错）
+	if (!IsLocalController()) return;
+
+	// 进入战斗后本次运行不再弹出
+	if (bGMDismissed) return;
+
+	if (GMWidget)
+	{
+		CloseGMWidget();
+		return;
+	}
+
+	if (!UIManager) return;
+
+	UClass* WidgetClass = GMWidgetClass ? GMWidgetClass.Get() : UElfGMWidget::StaticClass();
+	GMWidget = UIManager->OpenUI(WidgetClass, this);
+	if (GMWidget)
+	{
+		bShowMouseCursor = true;
+		SetInputMode(FInputModeGameAndUI());
+	}
+}
+
+bool AElfPlayerController::GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames)
+{
+	// 非服务器：发给服务器执行，保证各客户端都拿到自己的正确队伍
+	if (!HasAuthority())
+	{
+		Server_GMReplaceElf(ElfRowName, SkillRowNames);
+		return true;
+	}
+	return GMReplaceElf_Authority(ElfRowName, SkillRowNames);
+}
+
+void AElfPlayerController::Server_GMReplaceElf_Implementation(FName ElfRowName, const TArray<FName>& SkillRowNames)
+{
+	GMReplaceElf_Authority(ElfRowName, SkillRowNames);
+}
+
+bool AElfPlayerController::GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames)
+{
+	AElfPlayerState* PS = GetPlayerState<AElfPlayerState>();
+	UElfGameInstance* GI = GetGameInstance<UElfGameInstance>();
+	if (!PS || !GI) return false;
+
+	FElfBaseData BaseData;
+	if (ElfRowName.IsNone() || !GI->GetElfBaseData(ElfRowName, BaseData))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[GM] 精灵行名无效: %s"), *ElfRowName.ToString());
+		return false;
+	}
+
+	FElfCreatureInstance NewElf;
+
+	// 等级继承（队伍非空时继承等级/经验/性别/性格/闪光/能量），队伍空则随机
+	if (PS->GetTeamCreatures().IsValidIndex(0))
+	{
+		const FElfCreatureInstance& Old = PS->GetTeamCreatures()[0];
+		NewElf.CreatureID = Old.CreatureID;
+		NewElf.Level = Old.Level;
+		NewElf.Exp = Old.Exp;
+		NewElf.Sex = Old.Sex;
+		NewElf.NatureID = Old.NatureID;
+		NewElf.bShiny = Old.bShiny;
+		NewElf.CurrentEnergy = Old.CurrentEnergy;
+	}
+	else
+	{
+		NewElf.Level = FMath::RandRange(1, 50);
+		NewElf.Sex = (FMath::RandBool() ? EElfSex::Male : EElfSex::Female);
+	}
+
+	// 个体值随机 0~31，努力值清零
+	NewElf.IV_HP = FMath::RandRange(0, 31);
+	NewElf.IV_ATK = FMath::RandRange(0, 31);
+	NewElf.IV_MATK = FMath::RandRange(0, 31);
+	NewElf.IV_DEF = FMath::RandRange(0, 31);
+	NewElf.IV_MDEF = FMath::RandRange(0, 31);
+	NewElf.IV_SPD = FMath::RandRange(0, 31);
+	NewElf.EV_HP = NewElf.EV_ATK = NewElf.EV_MATK = NewElf.EV_DEF = NewElf.EV_MDEF = NewElf.EV_SPD = 0;
+
+	NewElf.CreatureRowName = ElfRowName;
+
+	// 技能：先用有效的输入技能，不足4个时从该精灵可学技能随机补充到4个（不重复、过滤无效技能）
+	TArray<FName> LearnPool;
+	for (const FSskillLearnCondition& Cond : BaseData.LearnableSkills)
+	{
+		FSkillData Tmp;
+		if (!Cond.SkillID.IsNone() && GI->GetSkillData(Cond.SkillID, Tmp))
+			LearnPool.AddUnique(Cond.SkillID);
+	}
+	if (LearnPool.IsEmpty() && GI->DefaultSkillIDs.Num() > 0)
+		LearnPool = GI->DefaultSkillIDs;
+
+	for (int32 i = 0; i < 4; i++)
+	{
+		FName SkillRow = SkillRowNames.IsValidIndex(i) ? SkillRowNames[i] : NAME_None;
+		FSkillData SkillData;
+		if (!SkillRow.IsNone() && GI->GetSkillData(SkillRow, SkillData) && !NewElf.EquippedSkills.Contains(SkillRow))
+		{
+			NewElf.EquippedSkills.Add(SkillRow);
+		}
+	}
+
+	// 补到 4 个：随机从可学技能取，避免与已有技能重复
+	while (NewElf.EquippedSkills.Num() < 4 && !LearnPool.IsEmpty())
+	{
+		FName Fill = NAME_None;
+		for (int32 Try = 0; Try < 8; Try++)
+		{
+			FName Cand = LearnPool[FMath::RandRange(0, LearnPool.Num() - 1)];
+			if (!NewElf.EquippedSkills.Contains(Cand))
+			{
+				Fill = Cand;
+				break;
+			}
+		}
+		if (Fill.IsNone())
+			break;
+		NewElf.EquippedSkills.Add(Fill);
+	}
+
+	// 清战斗状态
+	NewElf.ActiveBuffs.Empty();
+	NewElf.LastUsedSkillType = ESkillType::Attack;
+	NewElf.bWishActive = false;
+	NewElf.bPendingEvolution = false;
+	NewElf.BackupFirstSkill = FName();
+
+	// 替换第 1 只
+	if (PS->GetTeamCreatures().Num() == 0)
+		PS->GetTeamCreatures().Add(NewElf);
+	else
+		PS->GetTeamCreatures()[0] = NewElf;
+
+	SaveGame(TEXT("Default"));
+
+	FString SkillsStr;
+	for (const FName& S : NewElf.EquippedSkills)
+		SkillsStr += S.ToString() + TEXT(" ");
+	UE_LOG(LogTemp, Warning, TEXT("[GM] 已替换第1只精灵为 %s Lv.%d 技能[%s]"), *ElfRowName.ToString(), NewElf.Level, *SkillsStr);
+	return true;
+}
+
 void AElfPlayerController::Client_EnterBattleMode_Implementation(AActor* Opponent, EBattleType BattleType)
 {
 	EnterBattleMode(Opponent, BattleType);
@@ -150,6 +318,11 @@ void AElfPlayerController::EnterBattleMode(AActor* Opponent, EBattleType BattleT
 {
 	if (bIsInBattle) return;
 	bIsInBattle = true;
+
+	// 进入战斗：关闭 GM 面板，本次运行不再弹出
+	bGMDismissed = true;
+	CloseGMWidget();
+
 	bShowMouseCursor = true;
 	SetInputMode(FInputModeGameAndUI());
 

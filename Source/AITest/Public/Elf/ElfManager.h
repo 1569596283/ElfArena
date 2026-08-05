@@ -38,6 +38,10 @@ struct FActiveBuff
 
 	UPROPERTY()
 	bool bIsBuff = true; // true=增益, false=减益
+
+	// 是否特性buff（特性施加的 buff 打此标记，清除所有增益/减益的技能不会清除它）
+	UPROPERTY()
+	bool bIsTraitBuff = false;
 };
 
 USTRUCT(BlueprintType)
@@ -138,6 +142,9 @@ struct FElfCreatureInstance
 
 	UPROPERTY()
 	ESkillType LastUsedSkillType = ESkillType::Attack;
+
+	// 战斗中最近使用技能的属性（瞬态，不入存档；供 UseElementSkill 特性匹配）
+	EElfType LastSkillElement = EElfType::None;
 
 	UPROPERTY()
 	bool bWishActive = false;

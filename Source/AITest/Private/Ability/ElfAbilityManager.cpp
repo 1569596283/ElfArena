@@ -49,14 +49,27 @@ void UElfAbilityManager::CreateAbilityInstances()
 
 			FElfBaseData BaseData;
 			if (!GI->GetElfBaseData(CreatureRowName, BaseData) || BaseData.AbilityID.IsNone())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s -> 无特性 或 未找到精灵数据"), *CreatureRowName.ToString());
 				continue;
+			}
 
 			FAbilityData AbilityData;
-			if (!GI->GetAbilityData(BaseData.AbilityID, AbilityData) || !AbilityData.AbilityClass)
+			if (!GI->GetAbilityData(BaseData.AbilityID, AbilityData))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s AbilityID=%s -> 特性行未找到（DT_Ability 没这行/未导入）"), *CreatureRowName.ToString(), *BaseData.AbilityID.ToString());
 				continue;
+			}
+			if (!AbilityData.AbilityClass)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s AbilityID=%s -> AbilityClass 无效（类引用没解析出来）"), *CreatureRowName.ToString(), *BaseData.AbilityID.ToString());
+				continue;
+			}
 
 			UElfAbilityBase* Instance = NewObject<UElfAbilityBase>(BattleModel, AbilityData.AbilityClass);
+			UE_LOG(LogTemp, Warning, TEXT("[Ability] %s -> 创建实例 %s (AbilityID=%s)"), *CreatureRowName.ToString(), *Instance->GetClass()->GetName(), *BaseData.AbilityID.ToString());
 			Instance->Init(BaseData.AbilityID, AbilityData.Trigger, AbilityData.Effects, AbilityData.TriggerDelay);
+			Instance->SetTriggerConditions(AbilityData.TriggerChance, AbilityData.HPThreshold, AbilityData.TargetElement, AbilityData.EnergyCostCondition);
 			Instance->SetContext(BattleModel, BuffManager, TurnManager, BattleController);
 			Side.AbilityInstances[i] = Instance;
 		}
@@ -179,7 +192,7 @@ void UElfAbilityManager::TriggerCreatureEnter(const FElfCreatureInstance* Creatu
 		{
 			Ability->TriggerAbility(Creature);
 			if (BattleController)
-				BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
+				if (BattleController && !Ability->IsNoPrompt()) BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
 
 			// 收集延迟
 			if (Ability->GetTriggerDelay() > 0.0f)
@@ -288,13 +301,12 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 				{
 					Ability->TriggerAbility(Creature);
 					if (BattleController)
-						BattleController->OnCreatureAbility.Broadcast(CheckSide, Ability->GetAbilityID());
+						if (BattleController && !Ability->IsNoPrompt()) BattleController->OnCreatureAbility.Broadcast(CheckSide, Ability->GetAbilityID());
 					if (Ability->GetTriggerDelay() > 0.0f)
 						PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
 				}
 			}
 		}
-		HandleTriggerCompletion(Creature);
 		return;
 	}
 
@@ -307,12 +319,11 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 		{
 			Ability->TriggerAbility(Creature);
 			if (BattleController)
-				BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
+				if (BattleController && !Ability->IsNoPrompt()) BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
 			if (Ability->GetTriggerDelay() > 0.0f)
 				PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
 		}
 	}
-	HandleTriggerCompletion(Creature);
 }
 
 void UElfAbilityManager::HandleTriggerCompletion(const FElfCreatureInstance* Creature)

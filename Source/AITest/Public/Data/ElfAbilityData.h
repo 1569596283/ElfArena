@@ -18,8 +18,8 @@ struct FAbilityData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "特性", meta = (DisplayName = "特性类"))
 	TSubclassOf<class UElfAbilityBase> AbilityClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "特性", meta = (DisplayName = "名称"))
-	FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "特性", meta = (DisplayName = "显示名称"))
+	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "特性", meta = (DisplayName = "描述"))
 	FText Description;
@@ -42,10 +42,16 @@ struct FAbilityData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "触发条件", meta = (DisplayName = "指定增益行名", ToolTip = "SelfHasBuff / EnemyHasBuffOrDebuff 指定 Buff 行名"))
 	FName BuffRowName;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "触发条件", meta = (DisplayName = "能耗条件", ToolTip = ">=0 时，仅能耗等于该值的技能触发特性增伤（配合 Effects 里的 Power 威力增幅）；-1=不启用"))
+	int32 EnergyCostCondition = -1;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "效果列表", ToolTip = "触发时执行的一次性效果/添加增益，复用技能效果风格"))
 	TArray<FSkillEffect> Effects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "触发延迟秒", ToolTip = ">0 时特性完成后等待该秒数再进入下一阶段（用于播动画）；<=0 不延迟"))
 	float TriggerDelay = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "不弹提示", ToolTip = "被动特性（如常驻威力增幅）不广播播报提示"))
+	bool bNoPrompt = false;
 };
 

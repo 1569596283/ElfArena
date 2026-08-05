@@ -17,35 +17,33 @@
 
 ## 下一阶段：拓展触发时机（核心）
 
-当前只有 **入场触发** 接了。`UElfEventManager` 事件总线已有 15 个 `Battle.Trigger.*` Tag，但 **回合内触发点（TurnStart/TurnEnd/受击/死亡/回能等）还没在 TurnManager/BuffManager 里广播**。
+当前已有 **入场触发** + **回合内触发点** 已接入。`UElfEventManager` 事件总线 15 个 `Battle.Trigger.*` Tag 中，以下已在对应钩子广播（`BroadcastEvent(Tag, Creature)`）：
 
-### 要接的触发点（在对应钩子处调 `EventManager->BroadcastEvent(Tag, Creature)`）
-
-| Tag | 插入位置 | 备注 |
+| Tag | 插入位置 | 状态 |
 |-----|---------|------|
-| `Battle.Trigger.TurnStart` | `UElfTurnManager::StartTurn()` | 回合开始 |
-| `Battle.Trigger.TurnEnd` | `UElfTurnManager::EndTurn()` | 回合结束 |
-| `Battle.Trigger.TakeDamage` | `ApplyAttack` 受伤方 | 连击多次计算 |
-| `Battle.Trigger.DealSuperEffective` | `ApplyAttack` 克制倍率>1 | 连击只算一次 |
-| `Battle.Trigger.UseElementSkill` | `ExecuteTurnAction` 技能属性匹配 | `TargetElement` 指定 |
-| `Battle.Trigger.FirstAttack` | 先手判定后 | |
-| `Battle.Trigger.OnDeath` | `CheckDeath` | |
-| `Battle.Trigger.EnemyLeftField` / `SelfLeftField` | 离场/死亡 | |
-| `Battle.Trigger.RestoreEnergy` | 回能处（技能/Buff） | |
-| `Battle.Trigger.OnField` / `OnBench` | 常驻被动，入场/离场施加 | |
-| `Battle.Trigger.SelfHasBuff` / `EnemyHasBuffOrDebuff` | Buff 增删钩子（BuffManager） | 状态判定型 |
+| `Battle.Trigger.TurnStart` | `UElfTurnManager::StartTurn()` | ✅ |
+| `Battle.Trigger.TurnEnd` | `UElfTurnManager::EndTurn()` | ✅ |
+| `Battle.Trigger.TakeDamage` | `ApplyAttack` 受伤方（每段） | ✅ |
+| `Battle.Trigger.DealSuperEffective` | `ApplyAttack` 克制倍率>1（每段一次） | ✅ |
+| `Battle.Trigger.UseElementSkill` | `ExecuteTurnAction`，`CanTrigger` 匹配 `TargetElement`（经 `Creature->LastSkillElement`） | ✅ |
+| `Battle.Trigger.FirstAttack` | `ResolveActions` 先手判定后（ActionQueue[0]） | ✅ |
+| `Battle.Trigger.OnDeath` | `CheckDeath` 死亡判定后、胜负结算前 | ✅ |
+| `Battle.Trigger.EnemyLeftField` / `SelfLeftField` | `UElfBattleManager::RecallCreature` 离场时 | ✅ |
+| `Battle.Trigger.RestoreEnergy` | 技能回能（`ApplyStatusEffects`）、Buff 回能（`ProcessTurnEndEffects`） | ✅ |
+| `Battle.Trigger.OnField` / `OnBench` | 常驻被动，入场/离场施加 | ⬜ 状态判定型，语义待定 |
+| `Battle.Trigger.SelfHasBuff` / `EnemyHasBuffOrDebuff` | Buff 增删钩子（BuffManager） | ⬜ 状态判定型，语义待定 |
 
 ### 注意
-- 回合内触发若配了 `TriggerDelay`，需等延迟完成再继续回合流程（复用 `OnAllAbilitiesTriggered` 模式）
+- 回合内触发**不阻塞回合流程**：`TriggerByEvent` 不再广播 `OnAllAbilitiesTriggered`（防回合内递归 / 意外 `StartTurn`）。回合内特性配了 `TriggerDelay` 时当前只记录不等待，动画窗口后续再处理
 - 部分触发是**状态判定型**（OnField/OnBench/持增益），不是"触发一次"，需想清楚触发语义（可能由 Buff 承担，或每次相关钩子广播后 `CanTrigger` 判断）
 - PVP：回合顺序同步尚未实现（服务器仲裁方案已讨论，见 PLAN 17 或另行记录）
 
 ## 其他待完成
 
 ### 特性相关
-- [ ] 接入回合内触发点（上表）
+- [x] 接入回合内触发点（上表，除状态判定型 OnField/OnBench/SelfHasBuff/EnemyHasBuffOrDebuff）
 - [ ] 特性效果扩展（更多 `EEffectID`，或特殊特性 C++ 子类）
-- [ ] `CanTrigger` 默认实现读取 `TriggerChance`/`HPThreshold`（当前恒真）
+- [ ] `CanTrigger` 默认实现读取 `TriggerChance`/`HPThreshold`（当前仅 UseElementSkill 属性匹配）
 - [ ] UI 播报绑定 `WBP_BattleTips`（蓝图）
 
 ### 动画

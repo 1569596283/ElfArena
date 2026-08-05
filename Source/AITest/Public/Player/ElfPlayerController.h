@@ -13,6 +13,7 @@ class UElfSaveGame;
 class UElfManager;
 class UUIManager;
 class UElfBattleManager;
+class UUserWidget;
 
 struct FInputActionValue;
 
@@ -48,6 +49,27 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "精灵")
 	void InitDefaultTeam();
+
+	// ==== GM 调试 ====
+	// 打开 GM 面板（进入战斗后 bGMDismissed=true，不再弹出）
+	UFUNCTION(Exec, BlueprintCallable, Category = "GM")
+	void OpenGM();
+
+	// GM 面板关闭时回调（由 GM Widget 调用）
+	void OnGMWidgetClosed();
+
+	// 关闭 GM 面板并恢复输入模式
+	void CloseGMWidget();
+
+	// 用指定精灵替换玩家第 1 只精灵：等级继承、个体随机；技能无效/空缺时从该精灵可学技能随机补
+	// 客户端调用会走 Server RPC，保证在服务器上执行并复制回各客户端
+	UFUNCTION(BlueprintCallable, Category = "GM")
+	bool GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames);
+
+	UFUNCTION(Server, Reliable)
+	void Server_GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames);
+
+	bool GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames);
 
 protected:
 	virtual void BeginPlay() override;
@@ -88,6 +110,16 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UElfBattleManager> BattleManager;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> GMWidget;
+
+	// GM 面板类（可在 BP_PlayerController 配置为继承 UElfGMWidget 的 GMHUD）
+	UPROPERTY(EditDefaultsOnly, Category = "GM")
+	TSubclassOf<UUserWidget> GMWidgetClass;
+
+	// 进入战斗后置 true，本次运行不再弹出 GM
+	bool bGMDismissed = false;
 
 	UPROPERTY()
 	TObjectPtr<AActor> SavedViewTarget;

@@ -19,6 +19,9 @@
 - 个体实例数据（FElfCreatureInstance）
 - UDataManager（UGameInstanceSubsystem，缓存野生精灵）
 - PlayerState 管理队伍（0~6）和仓库，支持多人复制
+- **`MaxHP = BaseHP × 2`**（`UElfStatCalculator`，提升战斗时长）
+- 显示名字段统一为 `DisplayName`（`Name` 留给 JSON 行名键，7 处结构体已改名，显示名可走 JSON/CSV）
+- 已配置精灵家族：暗系/风系/火系/草系/水系/暗系2/地系/普通/水系2/暗草（1~100 行号，共 27 只）
 - 已知限制：属性计算目前只取种族值，等级/个体值/努力值/性格修正未参与（待实现）
 
 ## 精灵基类
@@ -239,11 +242,44 @@
 - 双方触发间隔 = 快方特性的 `TriggerDelay`（≤0 保底 0.5s）
 - 播报：`BattleController->OnCreatureAbility(Side, AbilityID)`（UI 蓝图绑定弹提示）
 
+### 回合内触发点
+- `UElfEventManager` 事件总线在 TurnManager/BuffManager/BattleManager 钩子处广播，`TriggerByEvent` 按精灵定位触发
+- 已接入：`TurnStart` / `TurnEnd` / `TakeDamage`（每段）/ `DealSuperEffective`（每段一次）/ `UseElementSkill`（`CanTrigger` 匹配 `TargetElement`）/ `FirstAttack` / `OnDeath` / `SelfLeftField` / `EnemyLeftField` / `RestoreEnergy`
+- `CanTrigger` 支持 UseElementSkill 属性匹配（`FElfCreatureInstance::LastSkillElement` 记录最近技能属性）
+- 回合内触发不阻塞回合流程（`TriggerByEvent` 不广播 `OnAllAbilitiesTriggered`）
+
 ### 关联修改
 - Buff `StatModPercent`：Value 填**整数百分比**（代码 /100），增益 `×(1+x)` / 减益 `×100/(100+x)`，同属性增益/减益**净额抵消**
 - `EEffectID` 新增 `DirectDamageGain` / `DirectDamageReduce`（直接伤害乘区，`EDirectGainCondition` 条件）
 - `EEffectID` 枚举末尾追加新值（避免破坏已有序列化）
 - `DT_Buff` 重建（删除废弃的 `DT_BuffDef` 重定向器），`BP_GameInstance` 需挂 `BuffDataTable` / `AbilityDataTable`
+
+### 效果与数值修正扩展
+- `EEffectType` 新增：`DealDamage`（物理威力伤害，不触发受击类效果）、`DrainEnemyEnergy`（敌方失能）、`StealEnergy`（偷取：目标失N、己方得实际偷取量）
+- `UElfAbilityBase` 新增虚函数：`ModifySkillPower`（技能威力增幅倍率）、`ModifyEnergyCost`（技能能耗修正）
+- `FAbilityData` 新增字段：`EnergyCostCondition`（能耗条件，>=0 时仅该能耗技能触发增伤）、`bNoPrompt`（被动特性不弹提示）
+- 集中式计算：`UElfTurnManager::GetAttackerDamageMultiplier`（buff威力+直接伤害乘区+攻击方特性增伤）、`GetSkillEnergyCost`（buff修正+在场精灵特性修正）
+- 特殊特性 C++ 子类：`UAbility_WaterDefense`（防御技能能耗-2）
+
+### 特性清单（已配）
+| 特性 | 家族 | 效果 |
+|------|------|------|
+| Intimidate 威吓 | 暗系 1-3 | 入场敌方攻-60% |
+| FirstStrike 先手强化 | 风系 11-12 | 先手攻击伤害+50% |
+| FireBoost 烈焰双攻 | 火系 21-23 | 火系技能后双攻+10%×2层 |
+| GrassHeal 回春 | 草系 31-32 | 草系技能后回10%血 |
+| WaterCost 水脉节能 | 水系 41 | 水系技能后能耗-1 |
+| EnergyDrain 能量虹吸 | 暗系2 51-53 | 暗系技能后敌方-2能量 |
+| Retaliate 反击 | 地系 61-63 | 受击对攻击者50物理伤害 |
+| LowCostPower 低耗强化 | 普通 71-73 | 能耗1技能威力+50% |
+| WaterDefenseDiscount 水御 | 水系2 81-83 | 防御技能能耗-2 |
+| DuskDrain 暮色汲取 | 暗草 91-93 | 回合结束偷敌方1能量 |
+
+## GM 调试
+- GM 面板进入游戏自动打开，进入战斗后本次运行不再弹（`bGMDismissed`）；`GMWidgetClass` 可在 BP_PlayerController 配置为 GMHUD 容器
+- `GMReplaceElf(精灵行名, 技能行名数组)`：等级继承、个体随机；技能不足4个从可学技能补满（不重复）
+- 客户端调用走 Server RPC（`Server_GMReplaceElf`），保证服务器执行并复制
+- `ElfBattleController` 新增 `GetCreatureMaxHP/GetCreatureCurrentHP(Side, SlotIndex)` 供 UI 按槽位取数值
 
 ## 多人模式支持
 - PlayerState 数据复制（TeamCreatures、WarehouseCreatures、AvatarID、CardID）

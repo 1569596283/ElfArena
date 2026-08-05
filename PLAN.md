@@ -360,6 +360,23 @@
 
 - 数值字段（概率 / 血量阈值等）配置在 `FAbilityData` 内，基类 `CanTrigger()` 统一判断（当前默认恒真，子类可重写）
 
+#### 效果类型扩展（已实现）
+
+- `DealDamage`：对目标造成物理威力伤害（`威力×己方物攻/目标物防`，带 buff 修正 + 直接伤害乘区，无属性、不触发受击类效果）——受击反击类特性用
+- `DrainEnemyEnergy`：目标失去固定能量
+- `StealEnergy`：目标失去最多 N 能量，己方获得实际偷取量（目标没得扣则不加）——偷取类特性用
+
+#### 数值修正钩子（已实现）
+
+- `UElfAbilityBase::ModifySkillPower(Side, SkillData)`：技能威力增幅倍率（伤害计算时攻击方特性调用；基类按 `EnergyCostCondition` + Effects 里 `Power` 值计算）
+- `UElfAbilityBase::ModifyEnergyCost(Side, SkillData, InOutCost)`：技能能耗修正（特殊特性用 C++ 子类重写，如 水系：防御技能能耗-2）
+- `FAbilityData` 新增字段：`EnergyCostCondition`（能耗条件，>=0 时仅该能耗技能触发增伤）、`bNoPrompt`（被动特性不弹提示）
+
+#### 集中式计算（已实现）
+
+- `UElfTurnManager::GetAttackerDamageMultiplier(攻击方, 目标方, 技能数据)`：buff 威力 + 直接伤害乘区 + 攻击方特性增伤，伤害公式统一乘，后续增伤/减伤都在此扩展
+- `UElfTurnManager::GetSkillEnergyCost(侧, 技能实例)`：buff 修正 + 在场精灵特性修正，统一计算技能实际能耗
+
 ### 7.8 最终属性计算
 
 最终属性 = 种族值 + 个体值 + 努力值 + 性格修正
@@ -422,7 +439,9 @@
 | TargetType | `EBuffTargetType` | Individual=增益减益, Side=印记 |
 | Duration | int32 | 持续回合（-1=无限） |
 | bPersistent | bool | 退场保留 |
-| TargetStat | `EElfBuffStat` | **StatModPercent/ModifyFlat** 时指定属性 |
+| bIsTraitBuff | bool | 特性buff（特性施加且不会被清除所有增益/减益的技能清除，一般增益/减益填 False） |
+| TargetStat | `EElfBuffStat` | **仅 ModifyFlat** 时指定单属性 |
+| StatFlags | `EElfBuffStatFlags` 位掩码 | **仅 StatModPercent**：修正的属性集合（ATK=1/MATK=2/DEF=4/MDEF=8/SPD=16/Power=32，勾选多项，如双攻+双防+速度 = 1\|2\|4\|8\|16） |
 | Value | float | 主数值（百分比/数值/比例） |
 | SecondaryValue | float | 辅助数值（ModifyEnergyCostAndPower/TurnEndElementDamage） |
 
@@ -437,10 +456,12 @@
 | RemainingTurns | 剩余回合（-1=无限） |
 | bPersistent | 退场保留 |
 | bIsBuff | true=增益, false=减益 |
+| bIsTraitBuff | 特性buff（DT_Buff 配置字段；特性施加且不会被清除所有增益/减益的技能清除，一般增益/减益填 False） |
 
 **存储位置：**
 - 印记 → `FBattleSideData::SideBuffs`
 - 增益/减益 → `FElfCreatureInstance::ActiveBuffs`
+- `bIsTraitBuff` 由 Buff 定义表 `FEffectData.bIsTraitBuff` 决定（特性只选择 BuffRowName，是否特殊由该 Buff 自身配置）
 
 ### 10.2 技能配置
 
@@ -458,32 +479,32 @@ Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, V
 | `ModifyEnergyCost` | 能耗变化（负=减少） | 技能能耗修正 | 能耗计算 |
 | `TurnEndRestoreEnergy` | 回复量 | 回合结束恢复能量 | 回合结束 |
 | `ModifySpeed` | 速度变化 | 速度修正 | 速度计算 |
-| `ModifyEnergyCostAndPower` | Value=威力倍率, SecondaryValue=能耗变化 | 能耗+威力同时修正 | 能耗+伤害 |
+| `ModifyEnergyCostAndPower` | Value=威力倍率百分比(50=+50%), SecondaryValue=能耗变化 | 能耗+威力同时修正 | 能耗+伤害 |
 | `ExtraBuffStack` | 额外层数 | 获得增益时额外层数 | 添加增益前 |
-| `TurnEndDamage` | 最大生命比例(0.03=3%) | 回合结束伤害 | 回合结束 |
+| `TurnEndDamage` | 最大生命百分比(3=3%) | 回合结束伤害 | 回合结束 |
 | `EnterDrainEnergy` | 扣除量 | 上场扣能 | 上场时 |
 
 #### 直接伤害乘区（独立乘区）
 
-- **`DirectDamageGain`**（直接伤害增益）：`GainCondition`=条件类型, `Value`=每单位增益倍率(0.1=+10%)
-- **`DirectDamageReduce`**（直接伤害减免）：`GainCondition`=条件类型, `Value`=每单位减免倍率(0.1=-10%)
-- **计算方式**：所有直接伤害增益倍率相乘 × 所有直接伤害减免倍率相乘（每项 `(1 ± Value×单位数×层数)`）
+- **`DirectDamageGain`**（直接伤害增益）：`GainCondition`=条件类型, `Value`=每单位增益百分比(10=+10%)
+- **`DirectDamageReduce`**（直接伤害减免）：`GainCondition`=条件类型, `Value`=每单位减免百分比(10=-10%)
+- **计算方式**：所有直接伤害增益倍率相乘 × 所有直接伤害减免倍率相乘（每项 `(1 ± Value/100×单位数×层数)`）
 - **条件类型**（`EDirectGainCondition`）：无条件 / 对方增益数量 / 己方增益数量
 - **钩子点**：伤害计算（威力乘区之后、属性克制之前）
-- 典型用法："对方每有一个增益效果，伤害增加10%" → `GainCondition=对方增益数量, Value=0.1`
+- 典型用法："对方每有一个增益效果，伤害增加10%" → `GainCondition=对方增益数量, Value=10`
 
 #### 增益/减益效果
 
 | EffectID | 参数 | 说明 |
 |----------|------|------|
-| `StatModPercent` | TargetStat=属性, Value=百分比整数(10=+10%, -60=-60%) | 属性百分比修正 |
+| `StatModPercent` | StatFlags=修正属性位掩码, Value=百分比整数(10=+10%, -60=-60%) | 属性百分比修正 |
 | `ModifyFlat` | TargetStat=属性, Value=数值 | 属性固定值修正 |
 | `ModifySpeed` | Value=速度变化 | 速度修正 |
 | `ModifyEnergyCost` | Value=能耗变化 | 能耗修正 |
 | `ModifyHitCount` | Value=连击变化 | 连击数修正 |
 | `DoubleHitCount` | 无参数 | 连击翻倍 |
-| `FreezeHP` | Value=冻结比例(0.05=5%) | 冻结生命 |
-| `TurnEndElementDamage` | Value=最大生命比例, SecondaryValue=元素类型int | 回合结束属性伤害 |
+| `FreezeHP` | Value=冻结百分比(5=5%) | 冻结生命 |
+| `TurnEndElementDamage` | Value=最大生命百分比, SecondaryValue=元素类型int | 回合结束属性伤害 |
 | `BlockSwitch` | 无参数 | 禁止替换 |
 
 **`StatModPercent` 计算规则**（Value 填整数百分比，代码自动 /100，层数叠加）：
@@ -496,6 +517,7 @@ Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, V
 
 - **`UElfBuffManager`** — 独立的增益管理器，处理所有 Buff 添加/层叠/过期/钩子分发
 - `TurnManager` 通过 `BuffManager->` 委托调用，职责分离
+- **`ClearGeneralBuffs(Side, bClearBuffs, bClearDebuffs)`** — 清除指定侧一般增益/减益（特性buff `bIsTraitBuff=true` 保留），供"清除所有增益/减益"技能调用
 
 ## 11. 精灵血脉属性
 
@@ -676,6 +698,7 @@ PlayerDecision（下一回合）
 - 所有数据表行结构后缀统一用 `Data`（`FEffectData`、`FItemData`、`FElfBaseData` 等）
 - `Def` 后缀不再使用
 - 类型枚举值通过 `EffectID` 识别，不依赖行名
+- **显示名字段用 `DisplayName`**（不用 `Name`）：JSON/CSV 里 `Name` 是行名键，显示名用 `DisplayName` 才能走导入；已有 7 处 `FText Name` 已全部改名（精灵/技能/Buff/道具/特性/NPC/图片）
 
 ## 17. 职责拆分
 
@@ -692,4 +715,101 @@ PlayerDecision（下一回合）
 - 输入路由 `HandleInput` 可独立或保留
 - 明确 Controller 不再持有战斗规则状态
 
-## 18. 待补充…
+## 18. 精灵家族生成规则（数据表配置）
+
+精灵按**家族（进化链）**组织：精灵A → 进化成 → 精灵B → 进化成 → 精灵C，每家族 1~3 只。
+
+### 行名与序号
+- 行名直接用**数字**，每个家族**预留 10 个序号**
+- 已分配：暗系 1~10 / 风系 11~20 / 火系 21~30 / 草系 31~40 / 水系 41~50
+- 后续新家族依次 +10 递增
+
+### 种族值（六项总和）
+| 形态 | 范围 |
+|------|------|
+| 初级 | 400~460 |
+| 中级 | 460~530 |
+| 最终 | 530~610 |
+
+- **单形态**：直接取最终范围（530~610）
+- **两形态**：第一形态取初级~中级范围（400~530），最终形态取最终范围（530~610）
+- **三形态**：初级（400~460）、中级（460~530）、最终（530~610）
+- **单项种族值 ≤ 255**；**生命值 80~120**（一般不取过低）
+
+### 特性分配（每个家族一个特性）
+| 家族 | 行号 | 特性 |
+|------|------|------|
+| 暗系 | 1~10 | Intimidate（威吓） |
+| 风系 | 11~20 | FirstStrike（先手强化） |
+| 火系 | 21~30 | FireBoost（火系技能双攻+10%） |
+| 草系 | 31~40 | GrassHeal（草系技能回血） |
+| 水系 | 41~50 | WaterCost（水系技能能耗-1） |
+| 暗系2 | 51~60 | EnergyDrain（能量虹吸：暗系技能后敌方-2能量） |
+| 地系 | 61~70 | Retaliate（反击：受击对攻击者50物理伤害） |
+| 普通系 | 71~80 | LowCostPower（低耗强化：能耗1技能威力+50%） |
+| 水系2 | 81~90 | WaterDefenseDiscount（水御：防御技能能耗-2，C++子类） |
+| 暗+草（双属性） | 91~100 | DuskDrain（暮色汲取：回合结束偷敌方1能量） |
+
+### 进化目标
+- `EvolutionTarget.RowName` = 下一形态行名（如 1→"2"），无进化为 `"None"`
+- 代码只读 `RowName`，`DataTable` 可留 `"None"`
+- 三形态：1→2→3；两形态：11→12；单形态：无
+
+### 可学习技能算法（最终形态）
+- **本系技能 10~15 个**（双属性时为两系合计）——精灵本系的技能池
+- **普通系技能 3~6 个**
+- **其他属性**：随机选 3~6 个属性，**其他系别技能共可学习 6~10 个**
+- 最终形态可学总池 ≈ **19~31 个**；初级形态依次更少，随等级/进化解锁更多
+- **不同精灵数量不固定**：各精灵在范围内随机取值（如 A 家 22 个、C 家 26 个），生成脚本用固定随机种子保证可复现
+- 当前配置 `UnlockLevel` 均填 0（等级解锁规则后续再定）
+
+### 待补充
+- `WorldBlueprint` / `BattleBlueprint` 暂为 `None`（需按精灵生成蓝图资源）
+- `LearnableSkills` 暂用占位技能（10000/20000/30000，普通系）
+- **元素系技能未配置**：火/草/水特性要真正触发，需在 `DT_ElfSkill` 补充对应元素技能并让精灵可学
+
+## 19. 技能设计规则
+
+### 行名 / ID 规则
+- 技能 `1`、`2` 为特殊技能（特殊编号，保留）
+- 其余技能 ID = 5 位数字：`[属性2位][能耗1位][序号2位]`
+  - 属性：从 10 开始，按属性表顺序 +1：Normal=10, Fire=11, Water=12, Grass=13, Electric=14, Earth=15, Wind=16, Ice=17, Dark=18, Light=19
+  - 能耗：0~9（超过 9 按 9 算）
+  - 序号：按创建顺序从 00 递增
+
+### 数值规则
+| 类型 | 规则 |
+|------|------|
+| 攻击 | 0费40威力，4费120威力（约每费 +20）；带特殊效果会占费用（同费威力更低） |
+| 状态 | 0费7层，4费18~24层；每层=单属性+10% 或 速度+10；单属性不超过140%（≤14层）；可分摊到多个属性，或附加其他属性减益增强 |
+| 防御 | 1费减伤70%，2费减伤50%~90%；带特殊效果会降低减伤 |
+
+### 应对（Counter）
+- 攻击应对状态 → `CounterEffects Power` = 额外威力百分比（当前：2费+50%、4费+100%）
+- 防御应对攻击 → `CounterEffects Power` = 减伤百分比（1费70%、2费80%/90%）
+- 状态应对防御：当前代码无加成，暂不配置
+
+### 当前生成（ElfSkill.json）
+- 10 属性 × 14 技能（7攻击 + 4状态 + 3防御）= 140 新技能，保留原有 5 个
+- 状态技能依赖的 buff 已补齐（物防/魔防/速度 增减）
+
+### 待办 / 备注
+- **攻击/防御技能的 Effects 暂不生效**（`ExecuteTurnAction` 只处理状态技能的 Effects）——特殊效果想法记这里，确认后加 C++ 支持：
+  - 攻击附带减益（命中降防/属性）
+  - 吸血（回复造成伤害一定比例）
+  - 防御附带自增益 / 回能
+- 精灵 `LearnableSkills` 需补各自属性的技能（当前引用占位的 10000/20000/30000），火/草/水特性才真正触发
+
+## 20. GM 调试工具
+
+- 进入游戏时自动打开 GM 面板（`OpenGM()`，BeginPlay 调用）；**进入战斗后关闭并本次运行不再弹出**（`bGMDismissed`）
+- 控制台 `OpenGM` 仍可手动开关（战斗后 no-op）
+- 面板结构：`WBP_GMHUD`（继承 `UUserWidget` 的**容器**，可承载多个 GM 面板），内部放继承 `UElfGMWidget` 的精灵替换面板
+- 面板类：`AElfPlayerController::GMWidgetClass`（EditDefaultsOnly，在 BP_PlayerController 配置为 `WBP_GMHUD`；未配置则 fallback 到纯 C++ `UElfGMWidget`）
+- 输入：精灵行名 + 最多 4 个技能行名 → 替换玩家第 1 只精灵
+- 替换规则：**等级继承、个体随机**（等级/经验/性别/性格/闪光/能量继承；个体值 0~31 随机、努力值清零）
+- 技能：有效行名直接装备；无效/空缺从该精灵可学技能池随机补
+- 自动存档；日志输出替换结果
+- 面板为纯 C++ Widget（`UElfGMWidget`），英文标签（避免默认字体中文 tofu）
+
+## 21. 待补充…

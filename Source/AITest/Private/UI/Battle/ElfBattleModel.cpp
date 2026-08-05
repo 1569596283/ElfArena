@@ -95,7 +95,7 @@ void UElfBattleModel::Init(APlayerController* OwnerPC, EBattleType Type, AActor*
 			FNPCData NPCData;
 			if (GI->GetNPCData(NPC->NPCDataID, NPCData))
 			{
-				OpponentName = NPCData.Name.ToString();
+				OpponentName = NPCData.DisplayName.ToString();
 				OpponentAvatarID = NPCData.AvatarID;
 
 				for (const FName& MemberID : NPCData.TeamMembers)
@@ -139,4 +139,16 @@ void UElfBattleModel::Init(APlayerController* OwnerPC, EBattleType Type, AActor*
 	default:
 		break;
 	}
+
+	// 进入对战时恢复满状态（精灵选择阶段即可读到满血/满能量）
+	auto RestoreFull = [](FBattleSideData& Side)
+	{
+		for (int32 i = 0; i < Side.Team.Num() && i < Side.CalculatedStats.Num(); i++)
+		{
+			Side.Team[i].CurrentHP = Side.CalculatedStats[i].MaxHP;
+			Side.Team[i].CurrentEnergy = 10;
+		}
+	};
+	RestoreFull(PlayerSide);
+	RestoreFull(EnemySide);
 }

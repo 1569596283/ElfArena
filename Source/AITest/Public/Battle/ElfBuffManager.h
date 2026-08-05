@@ -24,9 +24,12 @@ public:
 	// 收集指定侧所有活跃 Buff（SideBuffs + ActiveBuffs）
 	void CollectActiveBuffs(EInfoSide Side, TArray<const FActiveBuff*>& OutBuffs);
 
-	// 添加 Buff/印记
+	// 添加 Buff/印记（bIsTraitBuff 由 Buff 定义表 FEffectData.bIsTraitBuff 决定）
 	void ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
 	void ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack = -1, int32 OverrideDuration = -1, bool bIsBuff = true);
+
+	// 清除指定侧所有一般增益/减益（特性buff 保留）。bClearBuffs=清一般增益, bClearDebuffs=清一般减益，返回清除数量
+	int32 ClearGeneralBuffs(EInfoSide Side, bool bClearBuffs, bool bClearDebuffs);
 
 	// 钩子
 	int32 GetModifiedEnergyCost(EInfoSide Side, int32 BaseCost);

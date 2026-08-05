@@ -15,6 +15,7 @@ class UElfBattleAI;
 class UElfGameInstance;
 class UElfSkillBase;
 class UElfBuffManager;
+class UElfEventManager;
 struct FBattleSideData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTurnPhaseChanged, ETurnPhase, NewPhase);
@@ -65,6 +66,11 @@ public:
 
 	// --- 增益减益系统 ---
 	UElfBuffManager* GetBuffManager() const { return BuffManager; }
+
+	// 集中计算技能实际能耗（buff 修正 + 在场精灵特性修正，如 水系：防御技能能耗-2）
+	int32 GetSkillEnergyCost(EInfoSide Side, UElfSkillBase* SkillInstance) const;
+	// 槽位版：bIsDefault=true 取默认技能实例
+	int32 GetSkillEnergyCost(EInfoSide Side, int32 SlotIndex, bool bIsDefault) const;
 
 	void OnCreatureEnteredField(EInfoSide Side);
 
@@ -186,6 +192,9 @@ protected:
 	void ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfoSide TargetSide, float DamageModifier = 1.0f);
 	void ApplyStatusEffects(const FTurnAction& Action, UElfSkillBase* SkillInstance);
 
+	// 集中计算攻击方总伤害增幅倍率（buff 威力 + 直接伤害乘区 + 攻击方特性增伤），伤害公式处统一乘
+	float GetAttackerDamageMultiplier(EInfoSide AttackerSide, EInfoSide TargetSide, const FSkillData& SkillData) const;
+
 	void EndTurn();
 
 	void CheckDeath(EInfoSide Side);
@@ -199,10 +208,14 @@ protected:
 	FElfCalculatedStats* GetActiveStats(EInfoSide Side);
 	UElfSkillBase* GetActiveSkillInstance(EInfoSide Side, int32 SlotIndex) const;
 	UElfSkillBase* GetActiveDefaultSkillInstance(EInfoSide Side, int32 SlotIndex) const;
+	// 按行动取技能实例（默认技能取默认实例，否则取装备实例）
+	UElfSkillBase* GetActionSkillInstance(const FTurnAction& Action) const;
 	bool HasAliveCreatures(EInfoSide Side) const;
 	int32 GetEffectiveSpeed(EInfoSide Side);
 	int32 GetSkillPriorityFor(EInfoSide Side, int32 SlotIndex) const;
 	UElfGameInstance* GetGameInstance() const;
+
+	UElfEventManager* GetEventManager() const;
 
 	UPROPERTY()
 	TObjectPtr<UElfBattleController> BattleController;
@@ -223,7 +236,7 @@ protected:
 
 	TArray<FTurnAction> ActionQueue;
 
-	// 逐行动作队列
+	// 逐行动作队列：DisplayActions=文字提示顺序（被应对→应对），ExecuteActions=生效顺序（应对→被应对）
 	TArray<FTurnAction> DisplayActions;
 	TArray<FTurnAction> ExecuteActions;
 	int32 CurrentActionIndex = 0;

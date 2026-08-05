@@ -81,8 +81,8 @@ struct FElfBaseData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "基础信息", meta = (DisplayName = "名称"))
-	FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "基础信息", meta = (DisplayName = "显示名称"))
+	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "基础信息", meta = (DisplayName = "描述"))
 	FText Description;

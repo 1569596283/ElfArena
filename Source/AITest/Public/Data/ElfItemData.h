@@ -22,8 +22,8 @@ struct FItemData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "道具")
-	FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "道具", meta = (DisplayName = "显示名称"))
+	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "道具")
 	FText Description;

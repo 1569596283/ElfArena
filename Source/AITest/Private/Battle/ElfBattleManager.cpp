@@ -1,6 +1,8 @@
 #include "Battle/ElfBattleManager.h"
 #include "Battle/ElfTurnManager.h"
 #include "Ability/ElfAbilityManager.h"
+#include "Event/ElfEventManager.h"
+#include "ElfGameplayTags.h"
 #include "Game/ElfGameInstance.h"
 #include "UI/UIManager.h"
 #include "UI/Battle/ElfBattleController.h"
@@ -281,6 +283,21 @@ void UElfBattleManager::RecallCreature(EInfoSide Side, int32 NextSlotIndex, bool
 		FElfCreatureInstance* Creature = SideData->GetActiveCreature();
 		if (Creature)
 		{
+			// 特性触发：离场（己方/敌方，换下时）
+			UElfEventManager* EventManager = nullptr;
+			if (OwnerPC)
+			{
+				if (UElfGameInstance* GI = OwnerPC->GetGameInstance<UElfGameInstance>())
+					EventManager = GI->GetSubsystem<UElfEventManager>();
+			}
+			if (EventManager)
+			{
+				const FGameplayTag& Tag = (Side == EInfoSide::Self)
+					? FElfGameplayTags::Get().Battle_Trigger_SelfLeftField
+					: FElfGameplayTags::Get().Battle_Trigger_EnemyLeftField;
+				EventManager->BroadcastEvent(Tag, Creature);
+			}
+
 			if (Side == EInfoSide::Self && Creature->bWishActive)
 			{
 				if (TurnManager)

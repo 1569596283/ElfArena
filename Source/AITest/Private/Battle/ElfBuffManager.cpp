@@ -2,6 +2,8 @@
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
 #include "Game/ElfGameInstance.h"
+#include "Event/ElfEventManager.h"
+#include "ElfGameplayTags.h"
 
 void UElfBuffManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 {
@@ -44,7 +46,7 @@ static TArray<float> BuildParamsFromDef(const FEffectData& Def)
 	TArray<float> P;
 	if (Def.EffectID == EEffectID::StatModPercent)
 	{
-		P.Add(static_cast<float>(Def.TargetStat));
+		P.Add(static_cast<float>(Def.StatFlags));
 		P.Add(Def.Value / 100.0f);
 	}
 	else if (Def.EffectID == EEffectID::ModifyFlat)
@@ -102,7 +104,7 @@ static TArray<float> BuildParamsFromDef(const FEffectData& Def)
 	return P;
 }
 
-// 同属性百分比修正的反方向抵消（净额）：增益/减益按总百分比互相抵消层数
+// 同属性百分比修正的反方向抵消（净额）：增益/减益按重叠属性的总百分比互相抵消层数
 static void ApplyOppositeCancellation(TArray<FActiveBuff>& BuffList, FActiveBuff& NewBuff)
 {
 	if (NewBuff.EffectID != EEffectID::StatModPercent || NewBuff.Params.Num() < 2)
@@ -114,7 +116,8 @@ static void ApplyOppositeCancellation(TArray<FActiveBuff>& BuffList, FActiveBuff
 		FActiveBuff& Existing = BuffList[i];
 		if (Existing.EffectID != EEffectID::StatModPercent || Existing.Params.Num() < 2)
 			continue;
-		if (Existing.Params[0] != NewBuff.Params[0])
+		// 属性位掩码有重叠才抵消
+		if ((FMath::RoundToInt(Existing.Params[0]) & FMath::RoundToInt(NewBuff.Params[0])) == 0)
 			continue;
 		if (Existing.bIsBuff == NewBuff.bIsBuff)
 			continue;
@@ -153,6 +156,7 @@ void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowNa
 	NewBuff.StackCount = (OverrideStack > 0) ? OverrideStack : 1;
 	NewBuff.RemainingTurns = (OverrideDuration >= 0) ? OverrideDuration : Def.Duration;
 	NewBuff.bIsBuff = bIsBuff;
+	NewBuff.bIsTraitBuff = Def.bIsTraitBuff;
 
 	if (bIsBuff)
 		OnBeforeAddBuff(TargetSide, NewBuff);
@@ -187,6 +191,7 @@ void UElfBuffManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, cons
 	NewBuff.StackCount = (OverrideStack > 0) ? OverrideStack : 1;
 	NewBuff.RemainingTurns = (OverrideDuration >= 0) ? OverrideDuration : Def.Duration;
 	NewBuff.bIsBuff = bIsBuff;
+	NewBuff.bIsTraitBuff = Def.bIsTraitBuff;
 
 	if (bIsBuff)
 		OnBeforeAddBuff(Side, NewBuff);
@@ -218,15 +223,22 @@ int32 UElfBuffManager::GetModifiedEnergyCost(EInfoSide Side, int32 BaseCost)
 	{
 		if (Buff->EffectID == EEffectID::ModifyEnergyCost && Buff->Params.IsValidIndex(0))
 			Cost = FMath::Max(0, Cost + FMath::RoundToInt(Buff->Params[0] * Buff->StackCount));
-		if (Buff->EffectID == EEffectID::ModifyEnergyCostAndPower && Buff->Params.IsValidIndex(0))
-			Cost = FMath::Max(0, Cost + FMath::RoundToInt(Buff->Params[0] * Buff->StackCount));
+		if (Buff->EffectID == EEffectID::ModifyEnergyCostAndPower && Buff->Params.IsValidIndex(1))
+			Cost = FMath::Max(0, Cost + FMath::RoundToInt(Buff->Params[1] * Buff->StackCount));
 	}
 	return Cost;
 }
 
 int32 UElfBuffManager::GetModifiedSpeed(EInfoSide Side, int32 BaseSpeed)
 {
-	int32 Speed = BaseSpeed;
+	// 百分比修正（StatModPercent，含 SPD 主/附加属性）
+	FElfCalculatedStats Tmp;
+	Tmp.MaxHP = Tmp.ATK = Tmp.MATK = Tmp.DEF = Tmp.MDEF = 0;
+	Tmp.SPD = BaseSpeed;
+	GetModifiedStats(Side, Tmp);
+	int32 Speed = Tmp.SPD;
+
+	// 固定修正（ModifySpeed / ModifyFlat 的 SPD）
 	TArray<const FActiveBuff*> Buffs;
 	CollectActiveBuffs(Side, Buffs);
 
@@ -261,7 +273,7 @@ float UElfBuffManager::GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSi
 {
 	float Multiplier = 1.0f;
 
-	// 攻击方直接伤害增益：倍率 = (1 + Value × 单位数) ^ 层数，所有相乘
+	// 攻击方直接伤害增益：倍率 = (1 + Value/100 × 单位数) ^ 层数，所有相乘
 	TArray<const FActiveBuff*> AttackBuffs;
 	CollectActiveBuffs(AttackerSide, AttackBuffs);
 	for (const FActiveBuff* Buff : AttackBuffs)
@@ -269,13 +281,13 @@ float UElfBuffManager::GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSi
 		if (Buff->EffectID == EEffectID::DirectDamageGain && Buff->Params.Num() >= 2)
 		{
 			int32 Units = GetGainConditionUnits(AttackerSide, DefenderSide, static_cast<EDirectGainCondition>(FMath::RoundToInt(Buff->Params[0])));
-			float PerUnit = Buff->Params[1];
+			float PerUnit = Buff->Params[1] / 100.0f;
 			float Gain = 1.0f + PerUnit * Units * Buff->StackCount;
 			Multiplier *= FMath::Max(0.0f, Gain);
 		}
 	}
 
-	// 防守方直接伤害减免：倍率 = max(0, 1 - Value × 单位数) ^ 层数，所有相乘
+	// 防守方直接伤害减免：倍率 = max(0, 1 - Value/100 × 单位数) ^ 层数，所有相乘
 	TArray<const FActiveBuff*> DefenseBuffs;
 	CollectActiveBuffs(DefenderSide, DefenseBuffs);
 	for (const FActiveBuff* Buff : DefenseBuffs)
@@ -283,7 +295,7 @@ float UElfBuffManager::GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSi
 		if (Buff->EffectID == EEffectID::DirectDamageReduce && Buff->Params.Num() >= 2)
 		{
 			int32 Units = GetGainConditionUnits(DefenderSide, AttackerSide, static_cast<EDirectGainCondition>(FMath::RoundToInt(Buff->Params[0])));
-			float PerUnit = Buff->Params[1];
+			float PerUnit = Buff->Params[1] / 100.0f;
 			float Reduce = 1.0f - PerUnit * Units * Buff->StackCount;
 			Multiplier *= FMath::Max(0.0f, Reduce);
 		}
@@ -301,20 +313,32 @@ void UElfBuffManager::GetModifiedStats(EInfoSide Side, FElfCalculatedStats& InOu
 	{
 		if (Buff.EffectID == EEffectID::StatModPercent && Buff.Params.Num() >= 2)
 		{
-			int32 StatIdx = FMath::RoundToInt(Buff.Params[0]);
 			float Percent = Buff.Params[1] * Buff.StackCount;
 			// Percent 为比例(0.4=+40%)。增益 ×(1+percent)；减益 ×100/(100+|percent|*100)
 			// 即减益 -0.6 → ×100/(100+60)=0.625
 			float Multiplier = (Percent >= 0.0f)
 				? (1.0f + Percent)
 				: 100.0f / (100.0f - Percent * 100.0f);
-			switch (StatIdx)
+
+			auto ApplyToStat = [&](int32 Idx)
 			{
-			case 0: InOutStats.ATK  = FMath::Max(1, FMath::RoundToInt(InOutStats.ATK  * Multiplier)); break;
-			case 1: InOutStats.MATK = FMath::Max(1, FMath::RoundToInt(InOutStats.MATK * Multiplier)); break;
-			case 2: InOutStats.DEF  = FMath::Max(1, FMath::RoundToInt(InOutStats.DEF  * Multiplier)); break;
-			case 3: InOutStats.MDEF = FMath::Max(1, FMath::RoundToInt(InOutStats.MDEF * Multiplier)); break;
-			}
+				switch (Idx)
+				{
+				case 0: InOutStats.ATK  = FMath::Max(1, FMath::RoundToInt(InOutStats.ATK  * Multiplier)); break;
+				case 1: InOutStats.MATK = FMath::Max(1, FMath::RoundToInt(InOutStats.MATK * Multiplier)); break;
+				case 2: InOutStats.DEF  = FMath::Max(1, FMath::RoundToInt(InOutStats.DEF  * Multiplier)); break;
+				case 3: InOutStats.MDEF = FMath::Max(1, FMath::RoundToInt(InOutStats.MDEF * Multiplier)); break;
+				case 4: InOutStats.SPD  = FMath::Max(1, FMath::RoundToInt(InOutStats.SPD  * Multiplier)); break;
+				}
+			};
+
+			// 属性位掩码：勾选的所有属性都修正
+			uint8 Flags = static_cast<uint8>(FMath::RoundToInt(Buff.Params[0]));
+			if (Flags & 1)  ApplyToStat(0); // ATK
+			if (Flags & 2)  ApplyToStat(1); // MATK
+			if (Flags & 4)  ApplyToStat(2); // DEF
+			if (Flags & 8)  ApplyToStat(3); // MDEF
+			if (Flags & 16) ApplyToStat(4); // SPD
 		}
 	}
 }
@@ -324,6 +348,9 @@ void UElfBuffManager::ProcessTurnEndEffects(EInfoSide Side)
 	FElfCreatureInstance* Creature = GetActiveCreature(Side);
 	FElfCalculatedStats* Stats = GetActiveStats(Side);
 	if (!Creature || !Stats) return;
+
+	UElfGameInstance* GI = GetGameInstance();
+	UElfEventManager* EventManager = GI ? GI->GetSubsystem<UElfEventManager>() : nullptr;
 
 	TArray<const FActiveBuff*> Buffs;
 	CollectActiveBuffs(Side, Buffs);
@@ -338,23 +365,27 @@ void UElfBuffManager::ProcessTurnEndEffects(EInfoSide Side)
 			int32 Restore = FMath::RoundToInt(Buff->Params[0] * Buff->StackCount);
 			Creature->CurrentEnergy = FMath::Min(10, Creature->CurrentEnergy + Restore);
 			bEnergyChanged = true;
+
+			// 特性触发：回复能量
+			if (EventManager)
+				EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_RestoreEnergy, Creature);
 		}
 		if (Buff->EffectID == EEffectID::TurnEndDamage && Buff->Params.IsValidIndex(0))
 		{
-			int32 Dmg = FMath::Max(1, FMath::RoundToInt(Stats->MaxHP * Buff->Params[0] * Buff->StackCount));
+			int32 Dmg = FMath::Max(1, FMath::RoundToInt(Stats->MaxHP * Buff->Params[0] / 100.0f * Buff->StackCount));
 			Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - Dmg);
 			bHPChanged = true;
 		}
 		if (Buff->EffectID == EEffectID::TurnEndElementDamage && Buff->Params.Num() >= 2)
 		{
-			float Pct = Buff->Params[1] * Buff->StackCount;
+			float Pct = Buff->Params[1] / 100.0f * Buff->StackCount;
 			int32 Dmg = FMath::Max(1, FMath::RoundToInt(Stats->MaxHP * Pct));
 			Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - Dmg);
 			bHPChanged = true;
 		}
 		if (Buff->EffectID == EEffectID::FreezeHP && Buff->Params.IsValidIndex(0))
 		{
-			float FreezePct = Buff->Params[0] * Buff->StackCount;
+			float FreezePct = Buff->Params[0] / 100.0f * Buff->StackCount;
 			int32 FreezeThreshold = FMath::RoundToInt(Stats->MaxHP * FreezePct);
 			if (Creature->CurrentHP <= FreezeThreshold)
 			{
@@ -453,6 +484,40 @@ void UElfBuffManager::TickBuffs(EInfoSide Side)
 	FElfCreatureInstance* Creature = GetActiveCreature(Side);
 	if (Creature)
 		TickOne(Creature->ActiveBuffs);
+}
+
+int32 UElfBuffManager::ClearGeneralBuffs(EInfoSide Side, bool bClearBuffs, bool bClearDebuffs)
+{
+	int32 Cleared = 0;
+
+	auto Filter = [&](TArray<FActiveBuff>& Buffs)
+	{
+		for (int32 i = Buffs.Num() - 1; i >= 0; i--)
+		{
+			const FActiveBuff& Buff = Buffs[i];
+			if (Buff.bIsTraitBuff) continue; // 特性buff 不清除
+			if (bClearBuffs && Buff.bIsBuff)
+			{
+				Buffs.RemoveAt(i);
+				Cleared++;
+			}
+			else if (bClearDebuffs && !Buff.bIsBuff)
+			{
+				Buffs.RemoveAt(i);
+				Cleared++;
+			}
+		}
+	};
+
+	FBattleSideData* SideData = GetSide(Side);
+	if (SideData)
+		Filter(SideData->SideBuffs);
+
+	FElfCreatureInstance* Creature = GetActiveCreature(Side);
+	if (Creature)
+		Filter(Creature->ActiveBuffs);
+
+	return Cleared;
 }
 
 FBattleSideData* UElfBuffManager::GetSide(EInfoSide Side)

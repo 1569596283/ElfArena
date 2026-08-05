@@ -3,7 +3,7 @@
 FElfCalculatedStats UElfStatCalculator::CalculateStats(const FElfBaseData& BaseData)
 {
 	FElfCalculatedStats Stats;
-	Stats.MaxHP = BaseData.BaseHP;
+	Stats.MaxHP = BaseData.BaseHP * 2;
 	Stats.ATK = BaseData.BaseATK;
 	Stats.MATK = BaseData.BaseMATK;
 	Stats.DEF = BaseData.BaseDEF;

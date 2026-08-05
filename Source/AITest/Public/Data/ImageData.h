@@ -9,8 +9,8 @@ struct FImageData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "图片")
-	FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "图片", meta = (DisplayName = "显示名称"))
+	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "图片")
 	TSoftObjectPtr<UTexture2D> Image;

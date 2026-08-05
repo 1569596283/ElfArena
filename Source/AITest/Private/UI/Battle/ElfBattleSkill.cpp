@@ -31,18 +31,7 @@ void UElfBattleSkill::OnClicked()
 int32 UElfBattleSkill::GetSkillEnergyCost() const
 {
 	UElfBattleController* Controller = GetBattleController();
-	if (!Controller) return 0;
-
-	FElfCreatureInstance Creature = Controller->GetSelfCreature(0);
-	if (!Creature.EquippedSkills.IsValidIndex(SlotIndex)) return 0;
-
-	UElfGameInstance* GI = Controller->GetOwnerPC() ? Controller->GetOwnerPC()->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return 0;
-
-	FSkillData SkillData;
-	if (!GI->GetSkillData(Creature.EquippedSkills[SlotIndex], SkillData)) return 0;
-
-	return SkillData.EnergyCost;
+	return Controller ? Controller->GetSkillEnergyCost(SlotIndex) : 0;
 }
 
 int32 UElfBattleSkill::GetCurrentPower() const
@@ -66,27 +55,7 @@ EPowerState UElfBattleSkill::GetPowerState() const
 int32 UElfBattleSkill::GetCurrentEnergyCost() const
 {
 	UElfBattleController* Controller = GetBattleController();
-	if (!Controller) return 0;	
-
-	FElfCreatureInstance Creature = Controller->GetSelfCreature(0);
-	if (!Creature.EquippedSkills.IsValidIndex(SlotIndex)) return 0;
-
-	UElfGameInstance* GI = Controller->GetOwnerPC() ? Controller->GetOwnerPC()->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return 0;
-
-	FSkillData SkillData;
-	if (!GI->GetSkillData(Creature.EquippedSkills[SlotIndex], SkillData)) return 0;
-
-	if (SkillData.SkillClass)
-	{
-		UElfSkillBase* SkillObj = Cast<UElfSkillBase>(SkillData.SkillClass.GetDefaultObject());
-		if (SkillObj)
-		{
-			return FMath::Max(0, SkillObj->GetEnergyCost(Controller, SlotIndex));
-		}
-	}
-
-	return FMath::Max(0, SkillData.EnergyCost);
+	return Controller ? Controller->GetSkillEnergyCost(SlotIndex) : 0;
 }
 
 EEnergyState UElfBattleSkill::GetEnergyState() const
