@@ -15,12 +15,16 @@ void UElfGMWidget::NativeConstruct()
 	WidgetTree->RootWidget = Root;
 
 	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	Title->SetText(FText::FromString(TEXT("GM - Replace First Elf")));
+	Title->SetText(FText::FromString(TEXT("GM - Replace Elf by Index")));
 	Title->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 1.0f, 0.3f)));
 	Root->AddChildToVerticalBox(Title);
 
+	IndexInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+	IndexInput->SetHintText(FText::FromString(TEXT("Slot Index (0 = first, default 0)")));
+	Root->AddChildToVerticalBox(IndexInput);
+
 	ElfInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	ElfInput->SetHintText(FText::FromString(TEXT("Elf Row Name (e.g. 41)")));
+	ElfInput->SetHintText(FText::FromString(TEXT("Elf Row Name (e.g. 101)")));
 	Root->AddChildToVerticalBox(ElfInput);
 
 	for (int32 i = 0; i < 4; i++)
@@ -53,16 +57,25 @@ void UElfGMWidget::NativeConstruct()
 	Root->AddChildToVerticalBox(StatusText);
 }
 
-bool UElfGMWidget::GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames)
+bool UElfGMWidget::GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex)
 {
 	AElfPlayerController* PC = GetOwningPlayer<AElfPlayerController>();
 	if (!PC) return false;
-	return PC->GMReplaceElf(ElfRowName, SkillRowNames);
+	return PC->GMReplaceElf(ElfRowName, SkillRowNames, SlotIndex);
 }
 
 void UElfGMWidget::OnConfirmClicked()
 {
 	FName ElfRow = FName(*ElfInput->GetText().ToString());
+
+	// 索引：空/非法填 0
+	int32 SlotIndex = 0;
+	FString IndexStr = IndexInput->GetText().ToString();
+	if (!IndexStr.IsEmpty())
+	{
+		SlotIndex = FCString::Atoi(*IndexStr);
+		if (SlotIndex < 0) SlotIndex = 0;
+	}
 
 	TArray<FName> Skills;
 	for (const TObjectPtr<UEditableTextBox>& Box : SkillInputs)
@@ -71,7 +84,7 @@ void UElfGMWidget::OnConfirmClicked()
 		Skills.Add(Text.IsEmpty() ? NAME_None : FName(*Text));
 	}
 
-	if (GMReplaceElf(ElfRow, Skills))
+	if (GMReplaceElf(ElfRow, Skills, SlotIndex))
 	{
 		SetStatus(TEXT("Done. Check log for details."));
 	}

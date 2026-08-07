@@ -6,6 +6,7 @@
 #include "ElfGameplayTags.h"
 #include "Data/ElfAbilityData.h"
 #include "Data/ElfBaseData.h"
+#include "Skill/ElfSkillBase.h"
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
 #include "Game/ElfGameInstance.h"
@@ -29,6 +30,124 @@ void UElfAbilityManager::Init(UElfBattleController* InBC, UElfBattleModel* InBM)
 	{
 		EventManager->OnGameplayEvent.AddUObject(this, &UElfAbilityManager::HandleGameplayEvent);
 	}
+
+	// 订阅能耗类 buff 变化：实时刷新"总能耗阈值"特性（如 低耗壁垒 双防）
+	if (BuffManager)
+	{
+		BuffManager->OnEnergyCostBuffChanged.AddUObject(this, &UElfAbilityManager::OnEnergyCostBuffChanged);
+	}
+
+	// 订阅能量变化：实时刷新"能量防御"特性（buff 层数 = 当前能量）
+	if (BattleController)
+	{
+		BattleController->OnSelfCreatureEnergyChanged.AddDynamic(this, &UElfAbilityManager::OnSelfEnergyChanged);
+		BattleController->OnEnemyCreatureEnergyChanged.AddDynamic(this, &UElfAbilityManager::OnEnemyEnergyChanged);
+	}
+}
+
+void UElfAbilityManager::OnSelfEnergyChanged(int32 Energy)
+{
+	RefreshEnergyDefenseTraits(EInfoSide::Self);
+}
+
+void UElfAbilityManager::OnEnemyEnergyChanged(int32 Energy)
+{
+	RefreshEnergyDefenseTraits(EInfoSide::Enemy);
+}
+
+void UElfAbilityManager::RefreshEnergyDefenseTraits(EInfoSide Side)
+{
+	if (!BattleModel || !BuffManager) return;
+
+	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+	if (!SideData) return;
+
+	FElfCreatureInstance* Creature = SideData->GetActiveCreature();
+	if (!Creature) return;
+
+	const int32 ActiveIdx = SideData->ActiveIndex;
+	if (!SideData->AbilityInstances.IsValidIndex(ActiveIdx)) return;
+
+	UElfAbilityBase* Ability = SideData->AbilityInstances[ActiveIdx];
+	if (!Ability || !Ability->IsEnergyDefense()) return;
+
+	const FName BuffRow = Ability->GetConditionBuffRowName();
+	if (BuffRow.IsNone()) return;
+	const FEffectData* Def = BuffManager->GetBuffDataCached(BuffRow);
+	if (!Def) return;
+
+	// 移除旧的层数，再按当前能量重新施加（能量 0 则保持移除）
+	Creature->ActiveBuffs.RemoveAll([BuffRow](const FActiveBuff& B) { return B.BuffDefRowName == BuffRow; });
+
+	if (Creature->CurrentEnergy > 0)
+	{
+		BuffManager->ApplyBuffToTarget(Side, BuffRow, *Def, Creature->CurrentEnergy, -1, true);
+	}
+}
+
+void UElfAbilityManager::OnEnergyCostBuffChanged(EInfoSide Side)
+{
+	RefreshTotalCostTraits(Side);
+}
+
+void UElfAbilityManager::RefreshTotalCostTraits(EInfoSide Side)
+{
+	if (!BattleModel || !BuffManager) return;
+
+	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+	if (!SideData) return;
+
+	FElfCreatureInstance* Creature = SideData->GetActiveCreature();
+	if (!Creature) return;
+
+	const int32 ActiveIdx = SideData->ActiveIndex;
+	if (!SideData->AbilityInstances.IsValidIndex(ActiveIdx)) return;
+
+	UElfAbilityBase* Ability = SideData->AbilityInstances[ActiveIdx];
+	if (!Ability || Ability->GetTotalCostThreshold() < 0) return;
+	if (!Ability->IsTriggerMatch(FElfGameplayTags::Get().Battle_Trigger_EnterBattle)) return;
+
+	// 计算在场精灵装备技能总能耗（含 buff/特性修正）
+	int32 TotalCost = 0;
+	for (int32 s = 0; s < Creature->EquippedSkills.Num(); s++)
+	{
+		if (UElfSkillBase* Inst = SideData->GetSkillInstance(ActiveIdx, s))
+			TotalCost += TurnManager ? TurnManager->GetSkillEnergyCost(Side, Inst) : Inst->GetInstanceEnergyCost();
+	}
+
+	const FName BuffRow = Ability->GetConditionBuffRowName();
+	if (BuffRow.IsNone()) return;
+	const FEffectData* Def = BuffManager->GetBuffDataCached(BuffRow);
+	if (!Def) return;
+
+	const bool bConditionMet = TotalCost < Ability->GetTotalCostThreshold();
+	const bool bHasBuff = Creature->ActiveBuffs.ContainsByPredicate(
+		[BuffRow](const FActiveBuff& B) { return B.BuffDefRowName == BuffRow; });
+
+	if (bConditionMet && !bHasBuff)
+	{
+		BuffManager->ApplyBuffToTarget(Side, BuffRow, *Def, 1, -1, true);
+	}
+	else if (!bConditionMet && bHasBuff)
+	{
+		Creature->ActiveBuffs.RemoveAll(
+			[BuffRow](const FActiveBuff& B) { return B.BuffDefRowName == BuffRow; });
+	}
+}
+
+bool UElfAbilityManager::ShouldStartWithZeroEnergy(UElfGameInstance* GI, const FName& CreatureRowName)
+{
+	if (!GI || CreatureRowName.IsNone()) return false;
+
+	FElfBaseData BaseData;
+	if (!GI->GetElfBaseData(CreatureRowName, BaseData) || BaseData.AbilityID.IsNone())
+		return false;
+
+	FAbilityData AbilityData;
+	if (!GI->GetAbilityData(BaseData.AbilityID, AbilityData))
+		return false;
+
+	return AbilityData.bStartWithZeroEnergy;
 }
 
 void UElfAbilityManager::CreateAbilityInstances()
@@ -49,27 +168,22 @@ void UElfAbilityManager::CreateAbilityInstances()
 
 			FElfBaseData BaseData;
 			if (!GI->GetElfBaseData(CreatureRowName, BaseData) || BaseData.AbilityID.IsNone())
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s -> 无特性 或 未找到精灵数据"), *CreatureRowName.ToString());
 				continue;
-			}
 
 			FAbilityData AbilityData;
 			if (!GI->GetAbilityData(BaseData.AbilityID, AbilityData))
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s AbilityID=%s -> 特性行未找到（DT_Ability 没这行/未导入）"), *CreatureRowName.ToString(), *BaseData.AbilityID.ToString());
 				continue;
-			}
 			if (!AbilityData.AbilityClass)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[Ability] %s AbilityID=%s -> AbilityClass 无效（类引用没解析出来）"), *CreatureRowName.ToString(), *BaseData.AbilityID.ToString());
 				continue;
-			}
 
 			UElfAbilityBase* Instance = NewObject<UElfAbilityBase>(BattleModel, AbilityData.AbilityClass);
-			UE_LOG(LogTemp, Warning, TEXT("[Ability] %s -> 创建实例 %s (AbilityID=%s)"), *CreatureRowName.ToString(), *Instance->GetClass()->GetName(), *BaseData.AbilityID.ToString());
 			Instance->Init(BaseData.AbilityID, AbilityData.Trigger, AbilityData.Effects, AbilityData.TriggerDelay);
 			Instance->SetTriggerConditions(AbilityData.TriggerChance, AbilityData.HPThreshold, AbilityData.TargetElement, AbilityData.EnergyCostCondition);
+			Instance->SetTeamConfig(AbilityData.bTeamTrigger, AbilityData.bStartWithZeroEnergy, Side.Team[i].CreatureID);
+			Instance->SetTotalCostThreshold(AbilityData.TotalCostThreshold);
+			Instance->SetNoMagicCostOnDeath(AbilityData.bNoMagicCostOnDeath);
+			Instance->SetEnergyDefense(AbilityData.bEnergyDefense);
+			Instance->SetPoisonExtraTick(AbilityData.bPoisonExtraTick);
 			Instance->SetContext(BattleModel, BuffManager, TurnManager, BattleController);
 			Side.AbilityInstances[i] = Instance;
 		}
@@ -198,6 +312,18 @@ void UElfAbilityManager::TriggerCreatureEnter(const FElfCreatureInstance* Creatu
 			if (Ability->GetTriggerDelay() > 0.0f)
 				PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
 		}
+
+		// 入场后按修正后能耗实时重算"总能耗阈值"特性（如 低耗壁垒：能耗buff增删实时更新双防）
+		if (Ability->GetTotalCostThreshold() >= 0)
+		{
+			RefreshTotalCostTraits(Side);
+		}
+
+		// 入场后按当前能量刷新"能量防御"特性（如 能量壁垒：每 1 能量双防 +10%）
+		if (Ability->IsEnergyDefense())
+		{
+			RefreshEnergyDefenseTraits(Side);
+		}
 	}
 }
 
@@ -265,10 +391,10 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 {
 	if (!BattleModel) return;
 
-	// 定位事件对应精灵所在侧与索引
+	// 定位事件对应精灵所在侧
 	EInfoSide Side = EInfoSide::Self;
-	int32 Index = -1;
-	for (int32 SideIdx = 0; SideIdx < 2; SideIdx++)
+	bool bFound = false;
+	for (int32 SideIdx = 0; SideIdx < 2 && !bFound; SideIdx++)
 	{
 		EInfoSide CheckSide = (SideIdx == 0) ? EInfoSide::Self : EInfoSide::Enemy;
 		FBattleSideData* SideData = (CheckSide == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
@@ -279,14 +405,13 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 			if (&SideData->Team[i] == Creature)
 			{
 				Side = CheckSide;
-				Index = i;
+				bFound = true;
 				break;
 			}
 		}
-		if (Index >= 0) break;
 	}
 
-	if (Index < 0)
+	if (!bFound)
 	{
 		// 未定位到精灵（如全局事件）→ 遍历两侧全部触发
 		for (int32 SideIdx = 0; SideIdx < 2; SideIdx++)
@@ -300,8 +425,8 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 				if (Ability->IsTriggerMatch(EventTag) && Ability->CanTrigger(Creature))
 				{
 					Ability->TriggerAbility(Creature);
-					if (BattleController)
-						if (BattleController && !Ability->IsNoPrompt()) BattleController->OnCreatureAbility.Broadcast(CheckSide, Ability->GetAbilityID());
+					if (BattleController && !Ability->IsNoPrompt())
+						BattleController->OnCreatureAbility.Broadcast(CheckSide, Ability->GetAbilityID());
 					if (Ability->GetTriggerDelay() > 0.0f)
 						PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
 				}
@@ -310,19 +435,25 @@ void UElfAbilityManager::TriggerByEvent(const FGameplayTag& EventTag, const FElf
 		return;
 	}
 
-	// 只触发该精灵的特性实例
-	FBattleSideData* TargetSide = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
-	if (!TargetSide || !TargetSide->AbilityInstances.IsValidIndex(Index)) return;
-	if (UElfAbilityBase* Ability = TargetSide->AbilityInstances[Index])
+	// 触发事件精灵所在侧的特性：
+	//   非团队被动 → 仅持有者 == 事件精灵才触发（按 CreatureID 归属，兼容队伍重排）
+	//   团队被动   → 同侧任意精灵触发该时机都算，效果作用于持有者（可能在场下）
+	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+	if (!SideData) return;
+
+	for (int32 i = 0; i < SideData->AbilityInstances.Num(); i++)
 	{
-		if (Ability->IsTriggerMatch(EventTag) && Ability->CanTrigger(Creature))
-		{
-			Ability->TriggerAbility(Creature);
-			if (BattleController)
-				if (BattleController && !Ability->IsNoPrompt()) BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
-			if (Ability->GetTriggerDelay() > 0.0f)
-				PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
-		}
+		UElfAbilityBase* Ability = SideData->AbilityInstances[i];
+		if (!Ability) continue;
+		if (!Ability->IsTriggerMatch(EventTag)) continue;
+		if (!Ability->IsTeamTrigger() && Ability->GetOwnerCreatureID() != Creature->CreatureID) continue;
+		if (!Ability->CanTrigger(Creature)) continue;
+
+		Ability->TriggerAbility(Creature);
+		if (BattleController && !Ability->IsNoPrompt())
+			BattleController->OnCreatureAbility.Broadcast(Side, Ability->GetAbilityID());
+		if (Ability->GetTriggerDelay() > 0.0f)
+			PendingMaxDelay = FMath::Max(PendingMaxDelay, Ability->GetTriggerDelay());
 	}
 }
 

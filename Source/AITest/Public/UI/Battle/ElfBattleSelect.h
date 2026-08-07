@@ -13,6 +13,8 @@ class AITEST_API UElfBattleSelect : public UElfBattleUserWidget
 	GENERATED_BODY()
 
 public:
+	virtual void NativeConstruct() override;
+
 	UFUNCTION(BlueprintCallable, Category = "选择")
 	void Init(EInfoSide InSide, int32 InSlotIndex);
 
@@ -27,6 +29,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "选择")
 	float LongPressDuration = 0.5f;
+
+	// 是否启用长按（长按=查看详情）；局内切换面板可设 false，使所有按压都走短按（高亮+待切换）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "选择")
+	bool bEnableLongPress = true;
 
 	UPROPERTY(BlueprintAssignable, Category = "选择")
 	FOnCreatureSlotClicked OnCreatureSelected;

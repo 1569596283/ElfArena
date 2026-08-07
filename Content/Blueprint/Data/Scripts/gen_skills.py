@@ -37,6 +37,10 @@ elems = [
     ('Ice', '冰霜', 17, ('AddMagicAttack', '魔攻'), ('AddDefense', '物防')),
     ('Dark', '暗影', 18, ('AddAttack', '物攻'), ('AddSpeed', '速度')),
     ('Light', '圣光', 19, ('AddAttack', '物攻'), ('AddMagicDefense', '魔防')),
+    ('Poison', '毒素', 20, ('AddAttack', '物攻'), ('AddSpeed', '速度')),
+    ('Fighting', '格斗', 21, ('AddAttack', '物攻'), ('AddDefense', '物防')),
+    ('Mechanical', '机械', 22, ('AddDefense', '物防'), ('AddMagicDefense', '魔防')),
+    ('Bug', '虫', 23, ('AddSpeed', '速度'), ('AddAttack', '物攻')),
 ]
 
 def power_effect(v):
@@ -128,8 +132,7 @@ for (ename, cn, code, stA, stB) in elems:
 skills = [s for s in skills if s['Name'] not in gen_ids]
 skills.extend(new_skills)
 
-with open(path, 'w', encoding='utf-8') as f:
-    json.dump(skills, f, ensure_ascii=False, indent='\t')
-    f.write('\n')
+with open(path, 'w', encoding='utf-16', newline='') as f:
+    f.write(json.dumps(skills, ensure_ascii=False, indent='\t') + '\n')
 
 print(f"total skills: {len(skills)} (generated {len(new_skills)})")

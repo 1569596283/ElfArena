@@ -2,6 +2,7 @@
 #include "Skill/ElfSkillBase.h"
 #include "Data/ElfStatCalculator.h"
 #include "Data/NPCData.h"
+#include "Ability/ElfAbilityManager.h"
 #include "Game/ElfGameInstance.h"
 #include "Player/ElfPlayerState.h"
 #include "Elf/ElfWorldBase.h"
@@ -141,12 +142,13 @@ void UElfBattleModel::Init(APlayerController* OwnerPC, EBattleType Type, AActor*
 	}
 
 	// 进入对战时恢复满状态（精灵选择阶段即可读到满血/满能量）
-	auto RestoreFull = [](FBattleSideData& Side)
+	auto RestoreFull = [GI](FBattleSideData& Side)
 	{
 		for (int32 i = 0; i < Side.Team.Num() && i < Side.CalculatedStats.Num(); i++)
 		{
 			Side.Team[i].CurrentHP = Side.CalculatedStats[i].MaxHP;
-			Side.Team[i].CurrentEnergy = 10;
+			Side.Team[i].CurrentEnergy =
+				UElfAbilityManager::ShouldStartWithZeroEnergy(GI, Side.Team[i].CreatureRowName) ? 0 : 10;
 		}
 	};
 	RestoreFull(PlayerSide);

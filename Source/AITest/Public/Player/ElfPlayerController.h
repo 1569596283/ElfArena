@@ -61,15 +61,15 @@ public:
 	// 关闭 GM 面板并恢复输入模式
 	void CloseGMWidget();
 
-	// 用指定精灵替换玩家第 1 只精灵：等级继承、个体随机；技能无效/空缺时从该精灵可学技能随机补
-	// 客户端调用会走 Server RPC，保证在服务器上执行并复制回各客户端
+	// 用指定精灵替换玩家指定索引（SlotIndex）的精灵：等级继承、个体随机；技能无效/空缺时从该精灵可学技能随机补
+	// 索引越界时按最后一只处理；队伍为空则新增；客户端调用会走 Server RPC，保证在服务器上执行并复制回各客户端
 	UFUNCTION(BlueprintCallable, Category = "GM")
-	bool GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames);
+	bool GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex = 0);
 
 	UFUNCTION(Server, Reliable)
-	void Server_GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames);
+	void Server_GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex);
 
-	bool GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames);
+	bool GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex);
 
 protected:
 	virtual void BeginPlay() override;

@@ -64,11 +64,17 @@ public:
 
 	void ChooseEnemyAction();
 
+	// 集中计算攻击方总伤害增幅倍率（buff 威力 + 直接伤害乘区 + 攻击方特性增伤），伤害公式处统一乘
+	float GetAttackerDamageMultiplier(EInfoSide AttackerSide, EInfoSide TargetSide, const FSkillData& SkillData) const;
+
 	// --- 增益减益系统 ---
 	UElfBuffManager* GetBuffManager() const { return BuffManager; }
 
 	// 集中计算技能实际能耗（buff 修正 + 在场精灵特性修正，如 水系：防御技能能耗-2）
 	int32 GetSkillEnergyCost(EInfoSide Side, UElfSkillBase* SkillInstance) const;
+
+	// 防守方特性对受到的攻击伤害的总修正倍率（乘算，如 属性亲和 -40%）
+	float GetDefenderDamageMultiplier(EInfoSide DefenderSide, const FSkillData& SkillData) const;
 	// 槽位版：bIsDefault=true 取默认技能实例
 	int32 GetSkillEnergyCost(EInfoSide Side, int32 SlotIndex, bool bIsDefault) const;
 
@@ -192,9 +198,6 @@ protected:
 	void ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfoSide TargetSide, float DamageModifier = 1.0f);
 	void ApplyStatusEffects(const FTurnAction& Action, UElfSkillBase* SkillInstance);
 
-	// 集中计算攻击方总伤害增幅倍率（buff 威力 + 直接伤害乘区 + 攻击方特性增伤），伤害公式处统一乘
-	float GetAttackerDamageMultiplier(EInfoSide AttackerSide, EInfoSide TargetSide, const FSkillData& SkillData) const;
-
 	void EndTurn();
 
 	void CheckDeath(EInfoSide Side);
@@ -246,8 +249,9 @@ protected:
 
 	FTimerHandle ExecutionTimer;
 
-	int32 PlayerFaintCount = 0;
-	int32 EnemyFaintCount = 0;
+	// 魔力值：每方初始 4，精灵被击倒扣 1，扣到 0 判负（即最多可被击倒 4 只）
+	int32 PlayerMagicPoints = 4;
+	int32 EnemyMagicPoints = 4;
 
 	// 道具 / 捕捉状态（迁移自 BattleController）
 	UPROPERTY()

@@ -41,8 +41,6 @@
 9. 显示对战 HUD：双方精灵状态（HP、能量、等级、名称）及我方技能面板
 10. 正式进入战斗，进入技能选择阶段
 
-### 2.2 对战类型
-
 ### 2.2 战斗场地
 
 在关卡远处（如 X=100000 附近）摆放一个固定战斗场景，包含：
@@ -77,7 +75,7 @@
 - **训练家对战**：与 NPC 训练家对战
 - **玩家对战（PvP）**：玩家与玩家对战
 
-### 2.3 开场动画信息展示
+### 2.5 开场动画信息展示
 
 开场动画（VS 界面）展示对战双方信息，根据对战类型不同显示内容不同：
 
@@ -102,7 +100,7 @@
 
 ---
 
-### 2.4 战斗输入控制
+### 2.6 战斗输入控制
 
 进入战斗后，输入系统分为两类：
 
@@ -309,6 +307,12 @@
   - `TriggerChance`（概率）、`HPThreshold`（血量阈值）、`TargetElement`（指定属性）、`BuffRowName`（指定增益）
   - `Effects`（`TArray<FSkillEffect>`）— 效果列表
   - `TriggerDelay`（秒）— 触发延迟，>0 时特性完成后等待该时长再进入下一阶段（用于播动画）
+  - `bTeamTrigger`（团队被动：同侧任意精灵触发该时机都算，效果作用于持有者，可在场下）
+  - `bStartWithZeroEnergy`（进战斗初始能量为 0）
+  - `TotalCostThreshold`（总技能能耗阈值：入场时持有者装备技能总能耗 < 该值才触发，如 低耗壁垒）
+  - `bNoMagicCostOnDeath`（死亡不消耗魔力值，如 牺牲）
+  - `bEnergyDefense`（每 1 能量双防 +10%，按当前能量实时更新 buff 层数，如 能量壁垒）
+  - `bPoisonExtraTick`（在场时双方中毒效果额外触发 1 次，如 毒疫）
 
 #### 触发时机（GameplayTag，已实现）
 
@@ -365,17 +369,26 @@
 - `DealDamage`：对目标造成物理威力伤害（`威力×己方物攻/目标物防`，带 buff 修正 + 直接伤害乘区，无属性、不触发受击类效果）——受击反击类特性用
 - `DrainEnemyEnergy`：目标失去固定能量
 - `StealEnergy`：目标失去最多 N 能量，己方获得实际偷取量（目标没得扣则不加）——偷取类特性用
+- `RestoreEnergy`（通用回能）：`GrassEnergy`（回合结束回 3 能量，`Trigger=TurnEnd`）等用
 
 #### 数值修正钩子（已实现）
 
 - `UElfAbilityBase::ModifySkillPower(Side, SkillData)`：技能威力增幅倍率（伤害计算时攻击方特性调用；基类按 `EnergyCostCondition` + Effects 里 `Power` 值计算）
 - `UElfAbilityBase::ModifyEnergyCost(Side, SkillData, InOutCost)`：技能能耗修正（特殊特性用 C++ 子类重写，如 水系：防御技能能耗-2）
+- `UElfAbilityBase::ModifyIncomingDamage(DefenderSide, SkillData)`：防守方特性对受到的攻击伤害修正倍率（基类 1.0；`UAbility_TypeResist` 属性亲和：受到自身携带技能系别攻击 -40%，排除默认技能，命中时广播 `OnCreatureAbility` 弹提示）
 - `FAbilityData` 新增字段：`EnergyCostCondition`（能耗条件，>=0 时仅该能耗技能触发增伤）、`bNoPrompt`（被动特性不弹提示）
+- 集中计算：`UElfTurnManager::GetAttackerDamageMultiplier`（攻击方增幅）与 `GetDefenderDamageMultiplier`（防守方减伤，乘入 `ApplyAttack` 伤害链）
 
 #### 集中式计算（已实现）
 
 - `UElfTurnManager::GetAttackerDamageMultiplier(攻击方, 目标方, 技能数据)`：buff 威力 + 直接伤害乘区 + 攻击方特性增伤，伤害公式统一乘，后续增伤/减伤都在此扩展
 - `UElfTurnManager::GetSkillEnergyCost(侧, 技能实例)`：buff 修正 + 在场精灵特性修正，统一计算技能实际能耗
+
+#### 实时刷新特性（已实现）
+
+- **总能耗阈值（低耗壁垒）**：`RefreshTotalCostTraits(Side)` 按修正后总能耗动态加/移除双防 buff；订阅 `BuffManager->OnEnergyCostBuffChanged`（能耗类 buff 增删/到期触发）
+- **能量防御（能量壁垒）**：`RefreshEnergyDefenseTraits(Side)` 按当前能量施加/移除 `EnergyDefense` buff（层数 = 当前能量）；订阅 `BattleController` 能量变化广播
+- **毒疫**：`HasPoisonExtraTickOnField()` 检查双方在场精灵，中毒（元素=毒）结算时额外触发 1 次
 
 ### 7.8 最终属性计算
 
@@ -518,6 +531,13 @@ Effects[0] = { Type: AddBuff, BuffRowName: "Buff_AtkUp", EffectTarget: 自己, V
 - **`UElfBuffManager`** — 独立的增益管理器，处理所有 Buff 添加/层叠/过期/钩子分发
 - `TurnManager` 通过 `BuffManager->` 委托调用，职责分离
 - **`ClearGeneralBuffs(Side, bClearBuffs, bClearDebuffs)`** — 清除指定侧一般增益/减益（特性buff `bIsTraitBuff=true` 保留），供"清除所有增益/减益"技能调用
+
+### 10.5 吸血 / 持续伤害 debuff（已实现）
+
+- **吸血（Lifesteal）**：`EEffectID::Lifesteal`，Value=百分比（10=10%）；`ApplyAttack` 造成伤害后按比例治疗攻击方（封顶最大HP）。`GetLifestealPercent(Side)` 汇总吸血层数。特性 buff 用 `TraitLifesteal`（50%）
+- **中毒（Poison）**：`TurnEndElementDamage`，Value=3（每层 3% 最大生命毒系伤害），毒系免疫
+- **灼烧（Burn）**：`TurnEndElementDamage`，Value=2（每层 2% 最大生命火系伤害），`FEffectData.bHalveStacksOnTurnEnd=true` 结算后层数减半（减到 0 移除），火系免疫
+- **元素免疫**：`ApplyBuffToTarget` 施加回合结束属性伤害 debuff 时，目标属性（Type1/2/3）含该元素则免疫；结算时同样跳过
 
 ## 11. 精灵血脉属性
 
@@ -693,6 +713,12 @@ PlayerDecision（下一回合）
 - 下回合 `StartTurn()` 自动重置
 - 取消愿力时手动重置为 `false`
 
+### 15.4 魔力值（击倒判负）
+
+- 每方 `PlayerMagicPoints` / `EnemyMagicPoints`，初始 **4**（最多可被击倒 4 只）
+- 精灵被击倒扣 1，扣到 **0 判负**（`CheckDeath`）
+- **特性 牺牲（Sacrifice）**：`bNoMagicCostOnDeath=true`，持有者被击倒不扣魔力值（整队全灭仍会因无存活精灵判负）
+
 ## 16. 数据表设计规范
 
 - 所有数据表行结构后缀统一用 `Data`（`FEffectData`、`FItemData`、`FElfBaseData` 等）
@@ -749,6 +775,23 @@ PlayerDecision（下一回合）
 | 普通系 | 71~80 | LowCostPower（低耗强化：能耗1技能威力+50%） |
 | 水系2 | 81~90 | WaterDefenseDiscount（水御：防御技能能耗-2，C++子类） |
 | 暗+草（双属性） | 91~100 | DuskDrain（暮色汲取：回合结束偷敌方1能量） |
+| 岩灵（地） | 101 | EarthCharge（地脉充能：初始能量0，己方放地系技能回3能量，团队被动） |
+| 暗魇（暗） | 111 | DarkLifesteal（暗影吸血：入场获50%吸血） |
+| 幽煞（暗） | 121 | DarkSteal（暗蚀：入场偷敌方2能量） |
+| 沧岩（普通+水） | 131~132 | DualDefUp（低耗壁垒：总能耗<4 双防+80%，实时更新） |
+| 曜岩（光+地） | 141~142 | TypeResist（属性亲和：受携带技能系别攻击-40%，C++子类） |
+| 草系回能 | 151、153 | GrassEnergy（光合充能：回合结束回3能量） |
+| 牺牲·草 | 161~163 | Sacrifice（牺牲：死亡不耗魔力值） |
+| 牺牲·草火 | 171~172 | Sacrifice（牺牲） |
+| 牺牲·草地 | 181~183 | Sacrifice（牺牲） |
+| 牺牲·草冰 | 191~192 | Sacrifice（牺牲） |
+| 炎（火） | 201~202 | FireFirstAtk（首击烈焰：入场首回合物攻+100%） |
+| 衡灵（普通） | 211 | EnergyDefense（能量壁垒：每1能量双防+10%，实时更新） |
+| 毒（毒系） | 221~223 | ToxinOverflow（毒疫：在场双方中毒额外触发1次） |
+
+### 家族形态比例
+
+- 按家族统计（非按精灵），1/2/3 形态家族比例目标 **2:3:4**（当前 23 家 ≈ **5:8:10**）
 
 ### 进化目标
 - `EvolutionTarget.RowName` = 下一形态行名（如 1→"2"），无进化为 `"None"`
@@ -773,9 +816,10 @@ PlayerDecision（下一回合）
 ### 行名 / ID 规则
 - 技能 `1`、`2` 为特殊技能（特殊编号，保留）
 - 其余技能 ID = 5 位数字：`[属性2位][能耗1位][序号2位]`
-  - 属性：从 10 开始，按属性表顺序 +1：Normal=10, Fire=11, Water=12, Grass=13, Electric=14, Earth=15, Wind=16, Ice=17, Dark=18, Light=19
+  - 属性：从 10 开始，按属性表顺序 +1：Normal=10, Fire=11, Water=12, Grass=13, Electric=14, Earth=15, Wind=16, Ice=17, Dark=18, Light=19, **Poison=20**
   - 能耗：0~9（超过 9 按 9 算）
   - 序号：按创建顺序从 00 递增
+- **占位技能已重编号**：`20000`(守)→`40000`、`30000`(治疗)→`40001`，腾出 20xxx 给毒系；`gen_skills.py` 的 `elems` 已含毒系（code 20），写回 UTF-16
 
 ### 数值规则
 | 类型 | 规则 |

@@ -188,23 +188,23 @@ void AElfPlayerController::OpenGM()
 	}
 }
 
-bool AElfPlayerController::GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames)
+bool AElfPlayerController::GMReplaceElf(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex)
 {
 	// 非服务器：发给服务器执行，保证各客户端都拿到自己的正确队伍
 	if (!HasAuthority())
 	{
-		Server_GMReplaceElf(ElfRowName, SkillRowNames);
+		Server_GMReplaceElf(ElfRowName, SkillRowNames, SlotIndex);
 		return true;
 	}
-	return GMReplaceElf_Authority(ElfRowName, SkillRowNames);
+	return GMReplaceElf_Authority(ElfRowName, SkillRowNames, SlotIndex);
 }
 
-void AElfPlayerController::Server_GMReplaceElf_Implementation(FName ElfRowName, const TArray<FName>& SkillRowNames)
+void AElfPlayerController::Server_GMReplaceElf_Implementation(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex)
 {
-	GMReplaceElf_Authority(ElfRowName, SkillRowNames);
+	GMReplaceElf_Authority(ElfRowName, SkillRowNames, SlotIndex);
 }
 
-bool AElfPlayerController::GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames)
+bool AElfPlayerController::GMReplaceElf_Authority(FName ElfRowName, const TArray<FName>& SkillRowNames, int32 SlotIndex)
 {
 	AElfPlayerState* PS = GetPlayerState<AElfPlayerState>();
 	UElfGameInstance* GI = GetGameInstance<UElfGameInstance>();
@@ -219,10 +219,13 @@ bool AElfPlayerController::GMReplaceElf_Authority(FName ElfRowName, const TArray
 
 	FElfCreatureInstance NewElf;
 
-	// 等级继承（队伍非空时继承等级/经验/性别/性格/闪光/能量），队伍空则随机
-	if (PS->GetTeamCreatures().IsValidIndex(0))
+	// 等级继承（优先目标索引；目标索引越界时取第 0 只；队伍空则随机）
+	TArray<FElfCreatureInstance>& Team = PS->GetTeamCreatures();
+	int32 TargetIndex = FMath::Max(0, SlotIndex);
+	int32 InheritIdx = Team.IsValidIndex(TargetIndex) ? TargetIndex : (Team.IsValidIndex(0) ? 0 : -1);
+	if (InheritIdx >= 0)
 	{
-		const FElfCreatureInstance& Old = PS->GetTeamCreatures()[0];
+		const FElfCreatureInstance& Old = Team[InheritIdx];
 		NewElf.CreatureID = Old.CreatureID;
 		NewElf.Level = Old.Level;
 		NewElf.Exp = Old.Exp;
@@ -294,18 +297,23 @@ bool AElfPlayerController::GMReplaceElf_Authority(FName ElfRowName, const TArray
 	NewElf.bPendingEvolution = false;
 	NewElf.BackupFirstSkill = FName();
 
-	// 替换第 1 只
-	if (PS->GetTeamCreatures().Num() == 0)
-		PS->GetTeamCreatures().Add(NewElf);
+	// 替换指定索引（越界按最后一只；队伍空则新增）
+	if (Team.Num() == 0)
+	{
+		Team.Add(NewElf);
+	}
 	else
-		PS->GetTeamCreatures()[0] = NewElf;
+	{
+		TargetIndex = FMath::Min(TargetIndex, Team.Num() - 1);
+		Team[TargetIndex] = NewElf;
+	}
 
 	SaveGame(TEXT("Default"));
 
 	FString SkillsStr;
 	for (const FName& S : NewElf.EquippedSkills)
 		SkillsStr += S.ToString() + TEXT(" ");
-	UE_LOG(LogTemp, Warning, TEXT("[GM] 已替换第1只精灵为 %s Lv.%d 技能[%s]"), *ElfRowName.ToString(), NewElf.Level, *SkillsStr);
+	UE_LOG(LogTemp, Warning, TEXT("[GM] 已替换第%d只精灵为 %s Lv.%d 技能[%s]"), TargetIndex + 1, *ElfRowName.ToString(), NewElf.Level, *SkillsStr);
 	return true;
 }
 

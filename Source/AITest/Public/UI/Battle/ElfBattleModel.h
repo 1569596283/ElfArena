@@ -115,13 +115,20 @@ struct FBattleSideData
 			DefaultSkillInstances.Add(Skills);
 		}
 
+		if (AbilityInstances.IsValidIndex(ActiveIndex))
+		{
+			UElfAbilityBase* Ability = AbilityInstances[ActiveIndex];
+			AbilityInstances.RemoveAt(ActiveIndex);
+			AbilityInstances.Add(Ability);
+		}
+
 		Team.Add(Creature);
 		ActiveIndex = Team.Num() - 1;
 	}
 
 	void MoveToFront(int32 Index)
 	{
-		if (!Team.IsValidIndex(Index) || Index == 0) return;
+		if (!Team.IsValidIndex(Index)) return;
 
 		FElfCreatureInstance Creature = Team[Index];
 		Team.RemoveAt(Index);
@@ -146,6 +153,13 @@ struct FBattleSideData
 			FSkillInstanceList Skills = DefaultSkillInstances[Index];
 			DefaultSkillInstances.RemoveAt(Index);
 			DefaultSkillInstances.Insert(Skills, 0);
+		}
+
+		if (AbilityInstances.IsValidIndex(Index))
+		{
+			UElfAbilityBase* Ability = AbilityInstances[Index];
+			AbilityInstances.RemoveAt(Index);
+			AbilityInstances.Insert(Ability, 0);
 		}
 
 		ActiveIndex = 0;

@@ -1,0 +1,193 @@
+[
+	{
+		"Name": "Default",
+		"AttackType": "None",
+		"StrongAgainst": [],
+		"ResistedBy": []
+	},
+	{
+		"Name": "Normal",
+		"AttackType": "Normal",
+		"StrongAgainst": [],
+		"ResistedBy": [
+			"Earth",
+			"Dark",
+			"Fighting"
+		]
+	},
+	{
+		"Name": "Fire",
+		"AttackType": "Fire",
+		"StrongAgainst": [
+			"Grass",
+			"Ice",
+			"Mechanical",
+			"Bug"
+		],
+		"ResistedBy": [
+			"Water",
+			"Earth"
+		]
+	},
+	{
+		"Name": "Water",
+		"AttackType": "Water",
+		"StrongAgainst": [
+			"Fire",
+			"Earth",
+			"Mechanical"
+		],
+		"ResistedBy": [
+			"Grass",
+			"Electric"
+		]
+	},
+	{
+		"Name": "Grass",
+		"AttackType": "Grass",
+		"StrongAgainst": [
+			"Water",
+			"Earth"
+		],
+		"ResistedBy": [
+			"Fire",
+			"Ice",
+			"Poison",
+			"Bug"
+		]
+	},
+	{
+		"Name": "Electric",
+		"AttackType": "Electric",
+		"StrongAgainst": [
+			"Water",
+			"Wind"
+		],
+		"ResistedBy": [
+			"Earth"
+		]
+	},
+	{
+		"Name": "Earth",
+		"AttackType": "Earth",
+		"StrongAgainst": [
+			"Fire",
+			"Electric",
+			"Poison"
+		],
+		"ResistedBy": [
+			"Water",
+			"Grass"
+		]
+	},
+	{
+		"Name": "Wind",
+		"AttackType": "Wind",
+		"StrongAgainst": [
+			"Light",
+			"Fighting",
+			"Bug"
+		],
+		"ResistedBy": [
+			"Electric",
+			"Ice",
+			"Mechanical"
+		]
+	},
+	{
+		"Name": "Ice",
+		"AttackType": "Ice",
+		"StrongAgainst": [
+			"Grass",
+			"Wind"
+		],
+		"ResistedBy": [
+			"Fire",
+			"Fighting",
+			"Mechanical"
+		]
+	},
+	{
+		"Name": "Dark",
+		"AttackType": "Dark",
+		"StrongAgainst": [
+			"Light",
+			"Poison"
+		],
+		"ResistedBy": [
+			"Fighting"
+		]
+	},
+	{
+		"Name": "Light",
+		"AttackType": "Light",
+		"StrongAgainst": [
+			"Dark",
+			"Fighting"
+		],
+		"ResistedBy": [
+			"Wind",
+			"Poison",
+			"Bug"
+		]
+	},
+	{
+		"Name": "Poison",
+		"AttackType": "Poison",
+		"StrongAgainst": [
+			"Grass",
+			"Light",
+			"Fighting"
+		],
+		"ResistedBy": [
+			"Earth",
+			"Dark",
+			"Mechanical"
+		]
+	},
+	{
+		"Name": "Fighting",
+		"AttackType": "Fighting",
+		"StrongAgainst": [
+			"Normal",
+			"Ice",
+			"Mechanical",
+			"Dark"
+		],
+		"ResistedBy": [
+			"Wind",
+			"Poison",
+			"Light",
+			"Bug"
+		]
+	},
+	{
+		"Name": "Mechanical",
+		"AttackType": "Mechanical",
+		"StrongAgainst": [
+			"Ice",
+			"Wind",
+			"Bug",
+			"Poison"
+		],
+		"ResistedBy": [
+			"Fire",
+			"Water",
+			"Fighting"
+		]
+	},
+	{
+		"Name": "Bug",
+		"AttackType": "Bug",
+		"StrongAgainst": [
+			"Grass",
+			"Light",
+			"Fighting"
+		],
+		"ResistedBy": [
+			"Fire",
+			"Wind",
+			"Mechanical"
+		]
+	}
+]

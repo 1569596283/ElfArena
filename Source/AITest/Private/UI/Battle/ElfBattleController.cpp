@@ -1,6 +1,7 @@
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
 #include "Battle/ElfTurnManager.h"
+#include "Battle/ElfBuffManager.h"
 #include "Data/ElfSkillData.h"
 #include "Data/ElfItemData.h"
 #include "Data/ElfBaseData.h"
@@ -66,6 +67,20 @@ void UElfBattleController::SelectCreature(int32 Index)
 	}
 }
 
+void UElfBattleController::HighlightSwitchSlot(int32 SlotIndex)
+{
+	PendingSwitchSlot = SlotIndex;
+	OnSwitchSlotHighlighted.Broadcast(SlotIndex);
+}
+
+void UElfBattleController::ConfirmSwitch()
+{
+	if (PendingSwitchSlot < 0) return;
+	OnSwitchSlotSelected.Broadcast(PendingSwitchSlot);
+	PendingSwitchSlot = -1;
+	OnSwitchSlotHighlighted.Broadcast(-1);
+}
+
 void UElfBattleController::ConfirmReady()
 {
 	if (bLocalPlayerReady) return;
@@ -83,14 +98,19 @@ void UElfBattleController::CancelReady()
 int32 UElfBattleController::CalculateSkillPower(int32 SlotIndex)
 {
 	if (!BattleModel) return 0;
-	FElfCreatureInstance* Creature = BattleModel->PlayerSide.GetActiveCreature();
-	if (!Creature || !Creature->EquippedSkills.IsValidIndex(SlotIndex)) return 0;
+	FElfCreatureInstance* Attacker = BattleModel->PlayerSide.GetActiveCreature();
+	FElfCreatureInstance* Defender = BattleModel->EnemySide.GetActiveCreature();
+	FElfCalculatedStats* AttackerStats = BattleModel->PlayerSide.GetActiveStats();
+	FElfCalculatedStats* DefenderStats = BattleModel->EnemySide.GetActiveStats();
+	if (!Attacker || !Defender || !AttackerStats || !DefenderStats) return 0;
+	if (!Attacker->EquippedSkills.IsValidIndex(SlotIndex)) return 0;
 
 	UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
-	if (!GI) return 0;
+	UElfTurnManager* TM = GetTurnManager();
+	if (!GI || !TM) return 0;
 
 	FSkillData SkillData;
-	if (!GI->GetSkillData(Creature->EquippedSkills[SlotIndex], SkillData)) return 0;
+	if (!GI->GetSkillData(Attacker->EquippedSkills[SlotIndex], SkillData)) return 0;
 
 	int32 BasePower = 0;
 	for (const FSkillEffect& Effect : SkillData.Effects)
@@ -101,17 +121,33 @@ int32 UElfBattleController::CalculateSkillPower(int32 SlotIndex)
 			break;
 		}
 	}
+	if (BasePower <= 0) return 0;
 
-	if (SkillData.SkillClass)
+	// 双方修正后属性（增益/减益）
+	FElfCalculatedStats ModAttacker = *AttackerStats;
+	FElfCalculatedStats ModDefender = *DefenderStats;
+	if (UElfBuffManager* BM = TM->GetBuffManager())
 	{
-		UAttackSkillBase* Attack = Cast<UAttackSkillBase>(SkillData.SkillClass.GetDefaultObject());
-		if (Attack)
-		{
-			return Attack->CalculateDamage(this, SlotIndex);
-		}
+		BM->GetModifiedStats(EInfoSide::Self, ModAttacker);
+		BM->GetModifiedStats(EInfoSide::Enemy, ModDefender);
 	}
 
-	return BasePower;
+	// 有效威力 = 基础威力 × 攻击方攻击增幅 × 防御方防御增幅倒数 × 攻击方特性/buff增幅
+	float Mult = 1.0f;
+	if (SkillData.DamageType == EDamageType::Physical)
+	{
+		Mult *= static_cast<float>(ModAttacker.ATK) / FMath::Max(1, AttackerStats->ATK);
+		Mult *= static_cast<float>(FMath::Max(1, DefenderStats->DEF)) / FMath::Max(1, ModDefender.DEF);
+	}
+	else
+	{
+		Mult *= static_cast<float>(ModAttacker.MATK) / FMath::Max(1, AttackerStats->MATK);
+		Mult *= static_cast<float>(FMath::Max(1, DefenderStats->MDEF)) / FMath::Max(1, ModDefender.MDEF);
+	}
+
+	Mult *= TM->GetAttackerDamageMultiplier(EInfoSide::Self, EInfoSide::Enemy, SkillData);
+
+	return FMath::Max(0, FMath::RoundToInt(BasePower * Mult));
 }
 
 int32 UElfBattleController::GetDefaultSkillPower(int32 SlotIndex) const
@@ -417,36 +453,31 @@ void UElfBattleController::HandleInput(const FGameplayTag& InputTag)
 	}
 	case EBattleInputMode::Switch:
 	{
-		if (InputTag == Tags.Input_Slot1) { PendingSwitchSlot = 1; OnSwitchSlotHighlighted.Broadcast(1); return; }
-		if (InputTag == Tags.Input_Slot2) { PendingSwitchSlot = 2; OnSwitchSlotHighlighted.Broadcast(2); return; }
-		if (InputTag == Tags.Input_Slot3) { PendingSwitchSlot = 3; OnSwitchSlotHighlighted.Broadcast(3); return; }
-		if (InputTag == Tags.Input_Slot4) { PendingSwitchSlot = 4; OnSwitchSlotHighlighted.Broadcast(4); return; }
-		if (InputTag == Tags.Input_Slot5) { PendingSwitchSlot = 5; OnSwitchSlotHighlighted.Broadcast(5); return; }
-		if (InputTag == Tags.Input_Slot6) { PendingSwitchSlot = 6; OnSwitchSlotHighlighted.Broadcast(6); return; }
+		if (InputTag == Tags.Input_Slot1) { HighlightSwitchSlot(1); return; }
+		if (InputTag == Tags.Input_Slot2) { HighlightSwitchSlot(2); return; }
+		if (InputTag == Tags.Input_Slot3) { HighlightSwitchSlot(3); return; }
+		if (InputTag == Tags.Input_Slot4) { HighlightSwitchSlot(4); return; }
+		if (InputTag == Tags.Input_Slot5) { HighlightSwitchSlot(5); return; }
+		if (InputTag == Tags.Input_Slot6) { HighlightSwitchSlot(6); return; }
 		if (InputTag == Tags.Input_Space && PendingSwitchSlot >= 0)
 		{
-			OnSwitchSlotSelected.Broadcast(PendingSwitchSlot);
-			PendingSwitchSlot = -1;
-			OnSwitchSlotHighlighted.Broadcast(-1);
+			ConfirmSwitch();
 			return;
 		}
 		break;
 	}
 	case EBattleInputMode::Capture:
 	{
-		if (InputTag == Tags.Input_Slot1) { PendingCaptureSlot = 0; OnCaptureSlotHighlighted.Broadcast(0); return; }
-		if (InputTag == Tags.Input_Slot2) { PendingCaptureSlot = 1; OnCaptureSlotHighlighted.Broadcast(1); return; }
-		if (InputTag == Tags.Input_Slot3) { PendingCaptureSlot = 2; OnCaptureSlotHighlighted.Broadcast(2); return; }
-		if (InputTag == Tags.Input_Slot4) { PendingCaptureSlot = 3; OnCaptureSlotHighlighted.Broadcast(3); return; }
-		if (InputTag == Tags.Input_Slot5) { PendingCaptureSlot = 4; OnCaptureSlotHighlighted.Broadcast(4); return; }
-		if (InputTag == Tags.Input_Slot6) { PendingCaptureSlot = 5; OnCaptureSlotHighlighted.Broadcast(5); return; }
+		if (InputTag == Tags.Input_Slot1) { HighlightCaptureSlot(0); return; }
+		if (InputTag == Tags.Input_Slot2) { HighlightCaptureSlot(1); return; }
+		if (InputTag == Tags.Input_Slot3) { HighlightCaptureSlot(2); return; }
+		if (InputTag == Tags.Input_Slot4) { HighlightCaptureSlot(3); return; }
+		if (InputTag == Tags.Input_Slot5) { HighlightCaptureSlot(4); return; }
+		if (InputTag == Tags.Input_Slot6) { HighlightCaptureSlot(5); return; }
 		if (InputTag == Tags.Input_Space)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Space in Capture mode, PendingCaptureSlot=%d, CaptureItemCount=%d"), PendingCaptureSlot, GetCaptureItemCount());
-			if (PendingCaptureSlot >= 0)
-			{
-				UseCaptureItem(PendingCaptureSlot);
-			}
+			ConfirmCapture();
 			return;
 		}
 		if (InputTag == Tags.Input_X) { SetInputMode(EBattleInputMode::Crafting); return; }
@@ -506,6 +537,18 @@ void UElfBattleController::UseCaptureItem(int32 FlatIndex)
 {
 	if (TurnManager)
 		TurnManager->UseCaptureItem(FlatIndex);
+}
+
+void UElfBattleController::HighlightCaptureSlot(int32 SlotIndex)
+{
+	PendingCaptureSlot = SlotIndex;
+	OnCaptureSlotHighlighted.Broadcast(SlotIndex);
+}
+
+void UElfBattleController::ConfirmCapture()
+{
+	if (PendingCaptureSlot < 0) return;
+	UseCaptureItem(PendingCaptureSlot);
 }
 
 int32 UElfBattleController::GetCaptureItemCount()

@@ -22,6 +22,10 @@ enum class EElfType : uint8
 	Ice      UMETA(DisplayName = "冰"),
 	Dark     UMETA(DisplayName = "暗"),
 	Light    UMETA(DisplayName = "光"),
+	Poison   UMETA(DisplayName = "毒"),
+	Fighting UMETA(DisplayName = "斗"),
+	Mechanical UMETA(DisplayName = "机械"),
+	Bug      UMETA(DisplayName = "虫"),
 	Leader   UMETA(DisplayName = "首领")
 };
 

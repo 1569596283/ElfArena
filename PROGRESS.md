@@ -21,7 +21,7 @@
 - PlayerState 管理队伍（0~6）和仓库，支持多人复制
 - **`MaxHP = BaseHP × 2`**（`UElfStatCalculator`，提升战斗时长）
 - 显示名字段统一为 `DisplayName`（`Name` 留给 JSON 行名键，7 处结构体已改名，显示名可走 JSON/CSV）
-- 已配置精灵家族：暗系/风系/火系/草系/水系/暗系2/地系/普通/水系2/暗草（1~100 行号，共 27 只）
+- 已配置精灵家族：基础 10 家族（暗/风/火/草/水/暗2/地/普通/水2/暗草，1~100）+ 新增 13 家族（岩灵/暗魇/幽煞/沧岩/曜岩/草系回能/牺牲×4/炎/衡灵/毒，101~223），共 23 家族 ≈52 只，形态比例（按家族）约 5:8:10
 - 已知限制：属性计算目前只取种族值，等级/个体值/努力值/性格修正未参与（待实现）
 
 ## 精灵基类
@@ -256,10 +256,23 @@
 
 ### 效果与数值修正扩展
 - `EEffectType` 新增：`DealDamage`（物理威力伤害，不触发受击类效果）、`DrainEnemyEnergy`（敌方失能）、`StealEnergy`（偷取：目标失N、己方得实际偷取量）
-- `UElfAbilityBase` 新增虚函数：`ModifySkillPower`（技能威力增幅倍率）、`ModifyEnergyCost`（技能能耗修正）
+- `UElfAbilityBase` 新增虚函数：`ModifySkillPower`（技能威力增幅倍率）、`ModifyEnergyCost`（技能能耗修正）、`ModifyIncomingDamage`（防守方减伤倍率）
 - `FAbilityData` 新增字段：`EnergyCostCondition`（能耗条件，>=0 时仅该能耗技能触发增伤）、`bNoPrompt`（被动特性不弹提示）
-- 集中式计算：`UElfTurnManager::GetAttackerDamageMultiplier`（buff威力+直接伤害乘区+攻击方特性增伤）、`GetSkillEnergyCost`（buff修正+在场精灵特性修正）
-- 特殊特性 C++ 子类：`UAbility_WaterDefense`（防御技能能耗-2）
+- 集中式计算：`UElfTurnManager::GetAttackerDamageMultiplier`（buff威力+直接伤害乘区+攻击方特性增伤）、`GetSkillEnergyCost`（buff修正+在场精灵特性修正）、`GetDefenderDamageMultiplier`（防守方减伤乘入 `ApplyAttack`）
+- 特殊特性 C++ 子类：`UAbility_WaterDefense`（防御技能能耗-2）、`UAbility_TypeResist`（属性亲和：受自身携带技能系别攻击 -40%，排除默认技能，命中播报）
+
+### 数据字段扩展（`FAbilityData` / `UElfAbilityBase`）
+- `bTeamTrigger`（团队被动：同侧任意精灵触发该时机都算，效果作用于持有者可在场下）
+- `bStartWithZeroEnergy`（进战斗初始能量 0）
+- `TotalCostThreshold`（总技能能耗阈值，入场按持有者装备技能总能耗 < 阈值才触发）
+- `bNoMagicCostOnDeath`（死亡不消耗魔力值）
+- `bEnergyDefense`（每 1 能量双防 +10%，按当前能量实时更新层数）
+- `bPoisonExtraTick`（在场双方中毒额外触发 1 次）
+- 基类新增 `FindOwnerCreature`（按 CreatureID 定位持有者，兼容队伍重排）、`GetConditionBuffRowName`
+
+### 实时刷新机制
+- `UElfBuffManager::OnEnergyCostBuffChanged` 委托（能耗类 buff 增删/到期广播）
+- `UElfAbilityManager`：`RefreshTotalCostTraits` / `RefreshEnergyDefenseTraits`；订阅能耗 buff 变化 + `BattleController` 能量变化广播
 
 ### 特性清单（已配）
 | 特性 | 家族 | 效果 |
@@ -274,10 +287,21 @@
 | LowCostPower 低耗强化 | 普通 71-73 | 能耗1技能威力+50% |
 | WaterDefenseDiscount 水御 | 水系2 81-83 | 防御技能能耗-2 |
 | DuskDrain 暮色汲取 | 暗草 91-93 | 回合结束偷敌方1能量 |
+| EarthCharge 地脉充能 | 岩灵 101 | 初始能量0；己方放地系技能回3能量给持有者（团队被动） |
+| DarkLifesteal 暗影吸血 | 暗魇 111 | 入场获 50% 吸血（特性buff） |
+| DarkSteal 暗蚀 | 幽煞 121 | 入场偷敌方在场精灵 2 能量 |
+| DualDefUp 低耗壁垒 | 沧岩 131-132 | 装备技能总能耗 <4 时双防 +80%（实时更新） |
+| TypeResist 属性亲和 | 曜岩 141-142 | 受携带技能系别攻击 -40%（C++子类） |
+| GrassEnergy 光合充能 | 草系回能 151/153 | 回合结束回 3 能量 |
+| Sacrifice 牺牲 | 牺牲 161-192 | 死亡不消耗魔力值 |
+| FireFirstAtk 首击烈焰 | 炎 201-202 | 入场首回合物攻 +100% |
+| EnergyDefense 能量壁垒 | 衡灵 211 | 每 1 能量双防 +10%（实时更新） |
+| ToxinOverflow 毒疫 | 毒 221-223 | 在场双方中毒额外触发 1 次 |
 
 ## GM 调试
 - GM 面板进入游戏自动打开，进入战斗后本次运行不再弹（`bGMDismissed`）；`GMWidgetClass` 可在 BP_PlayerController 配置为 GMHUD 容器
 - `GMReplaceElf(精灵行名, 技能行名数组)`：等级继承、个体随机；技能不足4个从可学技能补满（不重复）
+- `GMReplaceElf(行名, 技能数组, SlotIndex)` 支持替换指定索引精灵（越界按最后一只，队伍空新增）
 - 客户端调用走 Server RPC（`Server_GMReplaceElf`），保证服务器执行并复制
 - `ElfBattleController` 新增 `GetCreatureMaxHP/GetCreatureCurrentHP(Side, SlotIndex)` 供 UI 按槽位取数值
 
@@ -285,3 +309,29 @@
 - PlayerState 数据复制（TeamCreatures、WarehouseCreatures、AvatarID、CardID）
 - Server RPC 队伍操作
 - 网络模式下服务端生成精灵/NPC → 复制到客户端
+
+## 新 Buff / Debuff（`DT_Buff`）
+- `TraitLifesteal`（特性吸血 50%）
+- `DualDefenseUp`（双防 +80%）
+- `FireFirstAtk`（物攻 +100%，1 回合）
+- `EnergyDefense`（每层双防 +10%）
+- `Poison` 中毒（每层 3% 最大生命毒系伤害，毒系免疫）
+- `Burn` 灼烧（每层 2% 最大生命火系伤害，层数减半，火系免疫）
+- `FEffectData.bHalveStacksOnTurnEnd`（灼烧结算后层数减半）
+
+## 毒系类型
+- `EElfType::Poison`（Light 后、Leader 前）
+- 毒系技能 14 个（属性码 20，20xxx）；占位技能 `20000`/`30000` 重编号为 `40000`/`40001`
+- 克制表 `TypeEffectiveness.json` 补全（12 行，毒克草/光、被地/暗抵抗；光暗互相克制；单向不抵消）
+- 生成脚本 `gen_skills.py` / `gen_elf_learnsets.py` 支持毒系（code 20）
+
+## 战斗系统修复 / 调整
+- **换将索引 off-by-one**：`RecallCreature` 在 `MoveActiveToEnd` 后调整释放索引；`MoveToFront` 始终更新 ActiveIndex
+- **手动切换回合中断**：`OnAllAbilitiesTriggered` 入场绑定改为 `OnEnterAbilitiesDone` 执行一次后解除，切换/换将入场不再误 `StartTurn`
+- **魔力值**：击倒计数改名 `PlayerMagicPoints`/`EnemyMagicPoints`，初始 4、扣到 0 判负
+- **默认蓝图回退**：`SpawnCreature`/`ElfSpawner` 未配 `BattleBlueprint`/`WorldBlueprint` 时回退 `Default` 行通用模型
+
+## 切换精灵 UI / 输入
+- 短按 = 按数字键效果（`HighlightSwitchSlot`：设 PendingSwitchSlot + 高亮），空格确认
+- 槽位按钮点击后清除/让出键盘焦点（延迟一帧），避免空格被按钮吞掉
+- `UElfBattleSelect.bEnableLongPress`（局内切换面板可禁长按，防误触详情）

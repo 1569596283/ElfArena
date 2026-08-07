@@ -13,6 +13,9 @@ class UElfBattleModel;
 class UElfGameInstance;
 struct FBattleSideData;
 
+// 能耗类 buff（ModifyEnergyCost / ModifyEnergyCostAndPower）增删/到期时广播，供"总能耗阈值"类特性实时刷新
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnEnergyCostBuffChanged, EInfoSide);
+
 UCLASS()
 class AITEST_API UElfBuffManager : public UObject
 {
@@ -40,12 +43,21 @@ public:
 	// 直接伤害乘区（所有直接伤害增益相乘 × 所有直接伤害减免相乘）
 	float GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSide DefenderSide);
 
+	// 吸血百分比（该侧所有吸血buff 的 Value×层数 之和，0=无吸血）
+	int32 GetLifestealPercent(EInfoSide Side);
+
 	void ProcessTurnEndEffects(EInfoSide Side);
 	void OnCreatureEnteredField(EInfoSide Side);
 	bool IsSwitchBlocked(EInfoSide Side);
 	void OnBeforeAddBuff(EInfoSide Side, FActiveBuff& NewBuff);
 
 	void TickBuffs(EInfoSide Side);
+
+	// 能耗类 buff 变化事件（增删/到期），供"总能耗阈值"特性实时刷新
+	FOnEnergyCostBuffChanged OnEnergyCostBuffChanged;
+
+	// 场上有"毒疫"特性精灵（任一侧在场精灵）时，双方中毒效果额外触发 1 次
+	bool HasPoisonExtraTickOnField() const;
 
 	// BuffDef 缓存
 	const FEffectData* GetBuffDataCached(FName RowName) const;

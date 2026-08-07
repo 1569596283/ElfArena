@@ -2,6 +2,7 @@
 #include "Battle/ElfBuffManager.h"
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
+#include "Game/ElfGameInstance.h"
 #include "Elf/ElfManager.h"
 #include "ElfGameplayTags.h"
 
@@ -19,6 +20,68 @@ void UElfAbilityBase::SetTriggerConditions(float InTriggerChance, float InHPThre
 	HPThreshold = InHPThreshold;
 	TargetElement = InTargetElement;
 	EnergyCostCondition = InEnergyCostCondition;
+}
+
+void UElfAbilityBase::SetTeamConfig(bool InTeamTrigger, bool InStartWithZeroEnergy, const FGuid& InOwnerCreatureID)
+{
+	bTeamTrigger = InTeamTrigger;
+	bStartWithZeroEnergy = InStartWithZeroEnergy;
+	OwnerCreatureID = InOwnerCreatureID;
+}
+
+void UElfAbilityBase::SetTotalCostThreshold(int32 InThreshold)
+{
+	TotalCostThreshold = InThreshold;
+}
+
+void UElfAbilityBase::SetNoMagicCostOnDeath(bool InValue)
+{
+	bNoMagicCostOnDeath = InValue;
+}
+
+void UElfAbilityBase::SetEnergyDefense(bool InValue)
+{
+	bEnergyDefense = InValue;
+}
+
+void UElfAbilityBase::SetPoisonExtraTick(bool InValue)
+{
+	bPoisonExtraTick = InValue;
+}
+
+FName UElfAbilityBase::GetConditionBuffRowName() const
+{
+	for (const FSkillEffect& Effect : Effects)
+	{
+		if (Effect.Type == EEffectType::AddBuff || Effect.Type == EEffectType::AddDebuff)
+			return Effect.BuffRowName;
+	}
+	return NAME_None;
+}
+
+FElfCreatureInstance* UElfAbilityBase::FindOwnerCreature(int32& OutSideIndex, int32& OutTeamIndex) const
+{
+	OutSideIndex = -1;
+	OutTeamIndex = -1;
+	if (!BattleModel || OwnerCreatureID.IsValid() == false) return nullptr;
+
+	for (int32 SideIdx = 0; SideIdx < 2; SideIdx++)
+	{
+		EInfoSide Side = (SideIdx == 0) ? EInfoSide::Self : EInfoSide::Enemy;
+		FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+		if (!SideData) continue;
+
+		for (int32 i = 0; i < SideData->Team.Num(); i++)
+		{
+			if (SideData->Team[i].CreatureID == OwnerCreatureID)
+			{
+				OutSideIndex = SideIdx;
+				OutTeamIndex = i;
+				return &SideData->Team[i];
+			}
+		}
+	}
+	return nullptr;
 }
 
 float UElfAbilityBase::ModifySkillPower(EInfoSide Side, const FSkillData& SkillData) const
@@ -46,6 +109,12 @@ void UElfAbilityBase::ModifyEnergyCost(EInfoSide Side, const FSkillData& SkillDa
 	// 默认不改，子类重写（如 水系：防御技能能耗-2）
 }
 
+float UElfAbilityBase::ModifyIncomingDamage(EInfoSide DefenderSide, const FSkillData& SkillData) const
+{
+	// 默认不减伤，子类重写（如 受到自身携带技能系别攻击 -40%）
+	return 1.0f;
+}
+
 void UElfAbilityBase::SetContext(UElfBattleModel* InModel, UElfBuffManager* InBuffManager, UElfTurnManager* InTurnManager, UElfBattleController* InBattleController)
 {
 	BattleModel = InModel;
@@ -64,6 +133,26 @@ bool UElfAbilityBase::CanTrigger(const FElfCreatureInstance* Creature) const
 			if (!Creature || Creature->LastSkillElement != TargetElement)
 				return false;
 		}
+	}
+
+	// 总技能能耗阈值：入场时，持有者装备技能总能耗必须小于阈值才触发（如 低耗双防）
+	if (TotalCostThreshold >= 0 && Trigger == FElfGameplayTags::Get().Battle_Trigger_EnterBattle)
+	{
+		int32 OwnerSideIdx = -1, OwnerTeamIdx = -1;
+		FElfCreatureInstance* Owner = FindOwnerCreature(OwnerSideIdx, OwnerTeamIdx);
+		if (!Owner) return false;
+
+		int32 TotalCost = 0;
+		if (UElfGameInstance* GI = BattleController ? BattleController->GetOwnerPC()->GetGameInstance<UElfGameInstance>() : nullptr)
+		{
+			for (const FName& SkillID : Owner->EquippedSkills)
+			{
+				FSkillData SkillData;
+				if (GI->GetSkillData(SkillID, SkillData))
+					TotalCost += SkillData.EnergyCost;
+			}
+		}
+		if (TotalCost >= TotalCostThreshold) return false;
 	}
 	return true;
 }
@@ -100,8 +189,27 @@ void UElfAbilityBase::TriggerAbility(const FElfCreatureInstance* Creature)
 	FBattleSideData* SelfSide = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
 	if (!SelfSide) return;
 
-	FElfCreatureInstance* Actor = SelfSide->GetActiveCreature();
-	FElfCalculatedStats* ActorStats = SelfSide->GetActiveStats();
+	// 团队被动：效果作用于特性持有者（可能在场下）；非团队被动：作用于己方在场精灵
+	FElfCreatureInstance* Actor = nullptr;
+	FElfCalculatedStats* ActorStats = nullptr;
+	if (bTeamTrigger)
+	{
+		int32 OwnerSideIdx = -1, OwnerTeamIdx = -1;
+		Actor = FindOwnerCreature(OwnerSideIdx, OwnerTeamIdx);
+		if (Actor && OwnerSideIdx >= 0 && OwnerSideIdx < 2)
+		{
+			Side = (OwnerSideIdx == 0) ? EInfoSide::Self : EInfoSide::Enemy;
+			TargetSide = (Side == EInfoSide::Self) ? EInfoSide::Enemy : EInfoSide::Self;
+			SelfSide = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+			if (SelfSide && SelfSide->CalculatedStats.IsValidIndex(OwnerTeamIdx))
+				ActorStats = &SelfSide->CalculatedStats[OwnerTeamIdx];
+		}
+	}
+	else
+	{
+		Actor = SelfSide->GetActiveCreature();
+		ActorStats = SelfSide->GetActiveStats();
+	}
 	if (!Actor) return;
 
 	// 遍历 Effects 执行通用效果

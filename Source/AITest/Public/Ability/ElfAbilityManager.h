@@ -12,6 +12,7 @@ class UElfAbilityBase;
 class UElfBuffManager;
 class UElfTurnManager;
 class UElfEventManager;
+class UElfGameInstance;
 struct FElfCreatureInstance;
 
 // 特性触发序列完成回调（含延迟等待结束后）
@@ -24,6 +25,9 @@ class AITEST_API UElfAbilityManager : public UObject
 
 public:
 	void Init(UElfBattleController* InBC, UElfBattleModel* InBM);
+
+	// 查询该精灵进战斗初始能量是否为 0（读取其特性配置 bStartWithZeroEnergy）
+	static bool ShouldStartWithZeroEnergy(UElfGameInstance* GI, const FName& CreatureRowName);
 
 	// 触发指定侧单只精灵的入场特性（手动切换：立即触发）
 	void TriggerEnter(EInfoSide Side);
@@ -38,6 +42,21 @@ public:
 	FOnAllAbilitiesTriggered OnAllAbilitiesTriggered;
 
 protected:
+	// 能耗类 buff 变化时实时重算"总能耗阈值"特性（动态加/移除条件buff）
+	void OnEnergyCostBuffChanged(EInfoSide Side);
+
+	// 能量变化时实时刷新"能量防御"特性（buff 层数 = 当前能量）
+	UFUNCTION()
+	void OnSelfEnergyChanged(int32 Energy);
+
+	UFUNCTION()
+	void OnEnemyEnergyChanged(int32 Energy);
+
+	void RefreshEnergyDefenseTraits(EInfoSide Side);
+
+	// 重算指定侧在场精灵的"总能耗阈值"特性
+	void RefreshTotalCostTraits(EInfoSide Side);
+
 	// 创建所有特性实例并注入上下文
 	void CreateAbilityInstances();
 

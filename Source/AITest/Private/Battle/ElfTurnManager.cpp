@@ -685,11 +685,15 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 	BuffManager->GetModifiedStats(AttackerSide, ModifiedAttacker);
 	BuffManager->GetModifiedStats(TargetSide, ModifiedTarget);
 
-	int32 Damage = AttackSkill->CalculateInstanceDamage(ModifiedAttacker, ModifiedTarget);
-	if (Damage <= 0) return;
+	int32 BaseDamage = AttackSkill->CalculateInstanceDamage(ModifiedAttacker, ModifiedTarget);
+	if (BaseDamage <= 0) return;
+	int32 Damage = BaseDamage;
 
 	// 攻击方总伤害增幅（buff 威力 + 直接伤害乘区 + 攻击方特性增伤）
 	Damage = FMath::Max(1, FMath::RoundToInt(Damage * GetAttackerDamageMultiplier(AttackerSide, TargetSide, SkillInstance->GetSkillDataRef())));
+
+	// 防守方特性减伤（如 属性亲和：受到自身携带技能系别攻击 -40%）
+	Damage = FMath::Max(1, FMath::RoundToInt(Damage * GetDefenderDamageMultiplier(TargetSide, SkillInstance->GetSkillDataRef())));
 
 	UElfGameInstance* GI = GetGameInstance();
 	float TypeMult = 1.0f;
@@ -710,6 +714,24 @@ void UElfTurnManager::ApplyAttack(EInfoSide AttackerSide, int32 SlotIndex, EInfo
 	Damage = FMath::Max(1, FMath::RoundToInt(Damage * DamageModifier));
 
 	Target->CurrentHP = FMath::Max(0, Target->CurrentHP - Damage);
+
+	// 吸血：攻击方有吸血buff时，按实际造成伤害的比例回复生命（封顶最大HP）
+	if (BuffManager)
+	{
+		int32 LifestealPercent = BuffManager->GetLifestealPercent(AttackerSide);
+		if (LifestealPercent > 0)
+		{
+			int32 Heal = FMath::RoundToInt(Damage * LifestealPercent / 100.0f);
+			if (Heal > 0)
+			{
+				Attacker->CurrentHP = FMath::Min(AttackerStats->MaxHP, Attacker->CurrentHP + Heal);
+				if (AttackerSide == EInfoSide::Self)
+					BattleController->OnSelfCreatureHPChanged.Broadcast(Attacker->CurrentHP, AttackerStats->MaxHP);
+				else
+					BattleController->OnEnemyCreatureHPChanged.Broadcast(Attacker->CurrentHP, AttackerStats->MaxHP);
+			}
+		}
+	}
 
 	// 特性触发：受到伤害（每段）+ 克制伤害（每段一次）
 	if (UElfEventManager* EventManager = GetEventManager())
@@ -766,6 +788,24 @@ float UElfTurnManager::GetAttackerDamageMultiplier(EInfoSide AttackerSide, EInfo
 	return Multiplier;
 }
 
+float UElfTurnManager::GetDefenderDamageMultiplier(EInfoSide DefenderSide, const FSkillData& SkillData) const
+{
+	float Multiplier = 1.0f;
+
+	// 防守方在场精灵特性减伤（如 属性亲和：受到自身携带技能系别攻击 -40%）
+	if (BattleModel)
+	{
+		FBattleSideData& SideData = (DefenderSide == EInfoSide::Self) ? BattleModel->PlayerSide : BattleModel->EnemySide;
+		if (SideData.AbilityInstances.IsValidIndex(SideData.ActiveIndex))
+		{
+			if (UElfAbilityBase* Ability = SideData.AbilityInstances[SideData.ActiveIndex])
+				Multiplier *= Ability->ModifyIncomingDamage(DefenderSide, SkillData);
+		}
+	}
+
+	return Multiplier;
+}
+
 int32 UElfTurnManager::GetSkillEnergyCost(EInfoSide Side, UElfSkillBase* SkillInstance) const
 {
 	if (!SkillInstance) return 0;
@@ -779,19 +819,7 @@ int32 UElfTurnManager::GetSkillEnergyCost(EInfoSide Side, UElfSkillBase* SkillIn
 		if (SideData.AbilityInstances.IsValidIndex(SideData.ActiveIndex))
 		{
 			if (UElfAbilityBase* Ability = SideData.AbilityInstances[SideData.ActiveIndex])
-			{
-				int32 Before = Cost;
 				Ability->ModifyEnergyCost(Side, SkillData, Cost);
-				UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d SkillType=%d Base=%d Ability=%s Cost %d->%d"), (int32)Side, (int32)SkillData.SkillType, SkillInstance->GetInstanceEnergyCost(), *Ability->GetClass()->GetName(), Before, Cost);
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d 特性实例为空"), (int32)Side);
-			}
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[Cost] Side=%d AbilityInstances 无效 ActiveIndex=%d"), (int32)Side, SideData.ActiveIndex);
 		}
 	}
 	return FMath::Max(0, Cost);
@@ -1309,18 +1337,30 @@ void UElfTurnManager::CheckDeath(EInfoSide Side)
 		EventManager->BroadcastEvent(FElfGameplayTags::Get().Battle_Trigger_OnDeath, Creature);
 	}
 
-	if (Side == EInfoSide::Self) PlayerFaintCount++;
-	else EnemyFaintCount++;
+	// 魔力值扣除：精灵被击倒扣 1，扣到 0 判负（初始 4，即最多可被击倒 4 只）
+	// 特性 牺牲：死亡时不消耗魔力值
+	bool bNoMagicCost = false;
+	{
+		FBattleSideData* SideData = (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+		if (SideData && SideData->AbilityInstances.IsValidIndex(SideData->ActiveIndex))
+		{
+			if (UElfAbilityBase* Ability = SideData->AbilityInstances[SideData->ActiveIndex])
+				bNoMagicCost = Ability->IsNoMagicCostOnDeath();
+		}
+	}
+	if (!bNoMagicCost)
+	{
+		if (Side == EInfoSide::Self) PlayerMagicPoints--;
+		else EnemyMagicPoints--;
+	}
 
-	int32 MaxFaints = 3;
-
-	if (PlayerFaintCount >= MaxFaints)
+	if (PlayerMagicPoints <= 0)
 	{
 		EndBattle(EBattleResult::PlayerLose);
 		return;
 	}
 
-	if (EnemyFaintCount >= MaxFaints)
+	if (EnemyMagicPoints <= 0)
 	{
 		EndBattle(EBattleResult::PlayerWin);
 		return;

@@ -118,7 +118,9 @@ enum class EEffectID : uint8
 	WishSkill             UMETA(DisplayName = "愿力获得技能"),
 
 	DirectDamageGain      UMETA(DisplayName = "直接伤害增益"),
-	DirectDamageReduce    UMETA(DisplayName = "直接伤害减免")
+	DirectDamageReduce    UMETA(DisplayName = "直接伤害减免"),
+
+	Lifesteal             UMETA(DisplayName = "吸血", ToolTip = "按攻击造成伤害的比例回复生命，Value=百分比(10=10%)")
 };
 
 UENUM(BlueprintType)
@@ -191,6 +193,9 @@ struct FEffectData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "参数", meta = (DisplayName = "辅助数值", EditCondition = "EffectID == EEffectID::ModifyEnergyCostAndPower || EffectID == EEffectID::TurnEndElementDamage"))
 	float SecondaryValue = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "效果", meta = (DisplayName = "回合结束层数减半", ToolTip = "回合结束属性伤害结算后，该 debuff 层数减半（如 灼烧）"))
+	bool bHalveStacksOnTurnEnd = false;
 };
 
 USTRUCT(BlueprintType)

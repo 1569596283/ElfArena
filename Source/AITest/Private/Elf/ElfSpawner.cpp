@@ -104,6 +104,13 @@ void AElfSpawner::SpawnOneCreature(UElfSpawnTargetComponent* Target, int32 Targe
 	if (!RowData) return;
 
 	TSubclassOf<AElfWorldBase> WorldBP = RowData->WorldBlueprint.LoadSynchronous();
+	// 未配置 WorldBlueprint 时回退到 Default 行通用模型
+	if (!WorldBP)
+	{
+		FElfBaseData* DefaultData = Entry.CreatureRow.DataTable->FindRow<FElfBaseData>(FName(TEXT("Default")), "");
+		if (DefaultData)
+			WorldBP = DefaultData->WorldBlueprint.LoadSynchronous();
+	}
 	if (!WorldBP) return;
 
 	FVector2D RandomOffset = FMath::RandPointInCircle(Target->SpawnRadius);
@@ -144,6 +151,13 @@ void AElfSpawner::SpawnOneCreatureRandom(int32 EntryIndex)
 	if (!RowData) return;
 
 	TSubclassOf<AElfWorldBase> WorldBP = RowData->WorldBlueprint.LoadSynchronous();
+	// 未配置 WorldBlueprint 时回退到 Default 行通用模型
+	if (!WorldBP)
+	{
+		FElfBaseData* DefaultData = Entry.CreatureRow.DataTable->FindRow<FElfBaseData>(FName(TEXT("Default")), "");
+		if (DefaultData)
+			WorldBP = DefaultData->WorldBlueprint.LoadSynchronous();
+	}
 	if (!WorldBP) return;
 
 	FVector SpawnLocation = GetRandomSpawnLocation(Entry.RandomSpawnRadius);

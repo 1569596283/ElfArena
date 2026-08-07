@@ -207,7 +207,12 @@ void UElfBattleManager::OnForcedSwitchAllComplete()
 
 void UElfBattleManager::OnEnterAbilitiesDone()
 {
-	// 入场特性触发完成，进入玩家决策回合
+	// 入场特性触发完成，进入玩家决策回合（仅战斗开始时生效）
+	// 执行完解除绑定：避免战斗中的切换/换将入场 TriggerEnter 也触发 OnAllAbilitiesTriggered → 误 StartTurn 打断回合
+	if (AbilityManager)
+	{
+		AbilityManager->OnAllAbilitiesTriggered.Clear();
+	}
 	if (TurnManager)
 		TurnManager->StartTurn();
 }
@@ -278,6 +283,7 @@ void UElfBattleManager::RecallCreature(EInfoSide Side, int32 NextSlotIndex, bool
 	}
 
 	FBattleSideData* SideData = (Side == EInfoSide::Self) ? &Model->PlayerSide : &Model->EnemySide;
+	int32 PrevActiveIndex = -1;
 	if (SideData)
 	{
 		FElfCreatureInstance* Creature = SideData->GetActiveCreature();
@@ -312,16 +318,24 @@ void UElfBattleManager::RecallCreature(EInfoSide Side, int32 NextSlotIndex, bool
 				}
 			}
 		}
+		PrevActiveIndex = SideData->ActiveIndex;
 		SideData->MoveActiveToEnd();
 	}
 
 	// 记录待释放信息，退场动画完成后执行
 	if (NextSlotIndex >= 0)
 	{
-		bRecallPending = true;
-		PendingReleaseSide = Side;
-		PendingReleaseSlot = NextSlotIndex;
-		bPendingReleaseIsForced = bForced;
+		// MoveActiveToEnd 将原在场精灵移到队尾，其后的精灵索引前移 1（目标在原在场精灵之前时不变）
+		int32 ReleaseIndex = NextSlotIndex;
+		if (SideData && PrevActiveIndex >= 0 && NextSlotIndex > PrevActiveIndex)
+			ReleaseIndex = NextSlotIndex - 1;
+		if (!SideData || SideData->Team.IsValidIndex(ReleaseIndex))
+		{
+			bRecallPending = true;
+			PendingReleaseSide = Side;
+			PendingReleaseSlot = ReleaseIndex;
+			bPendingReleaseIsForced = bForced;
+		}
 	}
 }
 
@@ -414,7 +428,14 @@ AActor* UElfBattleManager::SpawnCreature(const FElfCreatureInstance& CreatureDat
 	FElfBaseData BaseData;
 	if (!GI->GetElfBaseData(CreatureData.CreatureRowName, BaseData)) return nullptr;
 
+	// 未配置 BattleBlueprint 时回退到 Default 行（通用模型），保证所有精灵可上场
 	TSubclassOf<AActor> BPClass = BaseData.BattleBlueprint.LoadSynchronous();
+	if (!BPClass)
+	{
+		FElfBaseData DefaultData;
+		if (GI->GetElfBaseData(FName(TEXT("Default")), DefaultData))
+			BPClass = DefaultData.BattleBlueprint.LoadSynchronous();
+	}
 	if (!BPClass) return nullptr;
 
 	FActorSpawnParameters Params;
@@ -494,9 +515,11 @@ void UElfBattleManager::EnterBattle()
 
 	if (Model)
 	{
+		UElfGameInstance* GI = OwnerPC ? OwnerPC->GetGameInstance<UElfGameInstance>() : nullptr;
 		for (int32 i = 0; i < Model->PlayerSide.Team.Num(); ++i)
 		{
-			Model->PlayerSide.Team[i].CurrentEnergy = 10;
+			Model->PlayerSide.Team[i].CurrentEnergy =
+				UElfAbilityManager::ShouldStartWithZeroEnergy(GI, Model->PlayerSide.Team[i].CreatureRowName) ? 0 : 10;
 			if (Model->PlayerSide.CalculatedStats.IsValidIndex(i))
 			{
 				Model->PlayerSide.Team[i].CurrentHP = Model->PlayerSide.CalculatedStats[i].MaxHP;
@@ -504,7 +527,8 @@ void UElfBattleManager::EnterBattle()
 		}
 		for (int32 i = 0; i < Model->EnemySide.Team.Num(); ++i)
 		{
-			Model->EnemySide.Team[i].CurrentEnergy = 10;
+			Model->EnemySide.Team[i].CurrentEnergy =
+				UElfAbilityManager::ShouldStartWithZeroEnergy(GI, Model->EnemySide.Team[i].CreatureRowName) ? 0 : 10;
 			if (Model->EnemySide.CalculatedStats.IsValidIndex(i))
 			{
 				Model->EnemySide.Team[i].CurrentHP = Model->EnemySide.CalculatedStats[i].MaxHP;

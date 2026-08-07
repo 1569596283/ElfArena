@@ -1,7 +1,9 @@
 #include "Battle/ElfBuffManager.h"
 #include "UI/Battle/ElfBattleController.h"
 #include "UI/Battle/ElfBattleModel.h"
+#include "Ability/ElfAbilityBase.h"
 #include "Game/ElfGameInstance.h"
+#include "Data/ElfBaseData.h"
 #include "Event/ElfEventManager.h"
 #include "ElfGameplayTags.h"
 
@@ -101,6 +103,10 @@ static TArray<float> BuildParamsFromDef(const FEffectData& Def)
 		P.Add(static_cast<float>(Def.GainCondition));
 		P.Add(Def.Value);
 	}
+	else if (Def.EffectID == EEffectID::Lifesteal)
+	{
+		P.Add(Def.Value);
+	}
 	return P;
 }
 
@@ -148,6 +154,22 @@ void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowNa
 	FElfCreatureInstance* Target = GetActiveCreature(TargetSide);
 	if (!Target) return;
 
+	// 元素免疫：回合结束属性伤害 debuff，目标属性含该元素则免疫（如 毒系免中毒、火系免灼烧）
+	if (Def.EffectID == EEffectID::TurnEndElementDamage && !bIsBuff)
+	{
+		EElfType Element = static_cast<EElfType>(FMath::RoundToInt(Def.SecondaryValue));
+		if (Element != EElfType::None)
+		{
+			UElfGameInstance* GI = GetGameInstance();
+			FElfBaseData BaseData;
+			if (GI && GI->GetElfBaseData(Target->CreatureRowName, BaseData) &&
+				(BaseData.Type1 == Element || BaseData.Type2 == Element || BaseData.Type3 == Element))
+			{
+				return; // 免疫
+			}
+		}
+	}
+
 	FActiveBuff NewBuff;
 	NewBuff.BuffDefRowName = BuffDefRowName;
 	NewBuff.bPersistent = Def.bPersistent;
@@ -172,10 +194,17 @@ void UElfBuffManager::ApplyBuffToTarget(EInfoSide TargetSide, FName BuffDefRowNa
 			Existing.StackCount += NewBuff.StackCount;
 			if (Existing.RemainingTurns >= 0)
 				Existing.RemainingTurns = FMath::Max(Existing.RemainingTurns, NewBuff.RemainingTurns);
+			// 能耗类 buff 变化 → 通知实时刷新总能耗特性
+			if (NewBuff.EffectID == EEffectID::ModifyEnergyCost || NewBuff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+				OnEnergyCostBuffChanged.Broadcast(TargetSide);
 			return;
 		}
 	}
 	Target->ActiveBuffs.Add(NewBuff);
+
+	// 能耗类 buff 变化 → 通知实时刷新总能耗特性
+	if (NewBuff.EffectID == EEffectID::ModifyEnergyCost || NewBuff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+		OnEnergyCostBuffChanged.Broadcast(TargetSide);
 }
 
 void UElfBuffManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, const FEffectData& Def, int32 OverrideStack, int32 OverrideDuration, bool bIsBuff)
@@ -207,10 +236,17 @@ void UElfBuffManager::ApplyBuffToSide(EInfoSide Side, FName BuffDefRowName, cons
 			Existing.StackCount += NewBuff.StackCount;
 			if (Existing.RemainingTurns >= 0)
 				Existing.RemainingTurns = FMath::Max(Existing.RemainingTurns, NewBuff.RemainingTurns);
+			// 能耗类 buff 变化 → 通知实时刷新总能耗特性
+			if (NewBuff.EffectID == EEffectID::ModifyEnergyCost || NewBuff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+				OnEnergyCostBuffChanged.Broadcast(Side);
 			return;
 		}
 	}
 	SideData->SideBuffs.Add(NewBuff);
+
+	// 能耗类 buff 变化 → 通知实时刷新总能耗特性
+	if (NewBuff.EffectID == EEffectID::ModifyEnergyCost || NewBuff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+		OnEnergyCostBuffChanged.Broadcast(Side);
 }
 
 int32 UElfBuffManager::GetModifiedEnergyCost(EInfoSide Side, int32 BaseCost)
@@ -304,6 +340,21 @@ float UElfBuffManager::GetDirectDamageMultiplier(EInfoSide AttackerSide, EInfoSi
 	return Multiplier;
 }
 
+int32 UElfBuffManager::GetLifestealPercent(EInfoSide Side)
+{
+	int32 Percent = 0;
+	TArray<const FActiveBuff*> Buffs;
+	CollectActiveBuffs(Side, Buffs);
+	for (const FActiveBuff* Buff : Buffs)
+	{
+		if (Buff->EffectID == EEffectID::Lifesteal && Buff->Params.IsValidIndex(0))
+		{
+			Percent += FMath::RoundToInt(Buff->Params[0]) * Buff->StackCount;
+		}
+	}
+	return Percent;
+}
+
 void UElfBuffManager::GetModifiedStats(EInfoSide Side, FElfCalculatedStats& InOutStats)
 {
 	FElfCreatureInstance* Creature = GetActiveCreature(Side);
@@ -378,10 +429,31 @@ void UElfBuffManager::ProcessTurnEndEffects(EInfoSide Side)
 		}
 		if (Buff->EffectID == EEffectID::TurnEndElementDamage && Buff->Params.Num() >= 2)
 		{
-			float Pct = Buff->Params[1] / 100.0f * Buff->StackCount;
-			int32 Dmg = FMath::Max(1, FMath::RoundToInt(Stats->MaxHP * Pct));
-			Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - Dmg);
-			bHPChanged = true;
+			// 元素免疫：目标属性含该元素则不结算伤害（如 火系免灼烧）
+			bool bImmune = false;
+			EElfType Element = static_cast<EElfType>(FMath::RoundToInt(Buff->Params[0]));
+			if (Element != EElfType::None && GI)
+			{
+				FElfBaseData BaseData;
+				if (GI->GetElfBaseData(Creature->CreatureRowName, BaseData) &&
+					(BaseData.Type1 == Element || BaseData.Type2 == Element || BaseData.Type3 == Element))
+				{
+					bImmune = true;
+				}
+			}
+			if (!bImmune)
+			{
+				float Pct = Buff->Params[1] / 100.0f * Buff->StackCount;
+				int32 Dmg = FMath::Max(1, FMath::RoundToInt(Stats->MaxHP * Pct));
+				Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - Dmg);
+				bHPChanged = true;
+
+				// 特性 毒疫：场上有该特性的精灵时，双方中毒效果额外触发 1 次
+				if (Element == EElfType::Poison && HasPoisonExtraTickOnField())
+				{
+					Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - Dmg);
+				}
+			}
 		}
 		if (Buff->EffectID == EEffectID::FreezeHP && Buff->Params.IsValidIndex(0))
 		{
@@ -392,6 +464,20 @@ void UElfBuffManager::ProcessTurnEndEffects(EInfoSide Side)
 				Creature->CurrentHP = FMath::Max(0, Creature->CurrentHP - FreezeThreshold);
 				bHPChanged = true;
 			}
+		}
+	}
+
+	// 灼烧类 debuff（bHalveStacksOnTurnEnd）：结算后层数减半，减到 0 移除
+	for (int32 i = Creature->ActiveBuffs.Num() - 1; i >= 0; i--)
+	{
+		FActiveBuff& Buff = Creature->ActiveBuffs[i];
+		if (Buff.EffectID != EEffectID::TurnEndElementDamage) continue;
+		const FEffectData* Def = GetBuffDataCached(Buff.BuffDefRowName);
+		if (!Def || !Def->bHalveStacksOnTurnEnd) continue;
+		Buff.StackCount /= 2;
+		if (Buff.StackCount <= 0)
+		{
+			Creature->ActiveBuffs.RemoveAt(i);
 		}
 	}
 
@@ -462,7 +548,9 @@ bool UElfBuffManager::IsSwitchBlocked(EInfoSide Side)
 
 void UElfBuffManager::TickBuffs(EInfoSide Side)
 {
-	auto TickOne = [](TArray<FActiveBuff>& Buffs)
+	bool bCostBuffRemoved = false;
+
+	auto TickOne = [&bCostBuffRemoved](TArray<FActiveBuff>& Buffs)
 	{
 		for (int32 i = Buffs.Num() - 1; i >= 0; i--)
 		{
@@ -471,6 +559,8 @@ void UElfBuffManager::TickBuffs(EInfoSide Side)
 				Buffs[i].RemainingTurns--;
 				if (Buffs[i].RemainingTurns == 0)
 				{
+					if (Buffs[i].EffectID == EEffectID::ModifyEnergyCost || Buffs[i].EffectID == EEffectID::ModifyEnergyCostAndPower)
+						bCostBuffRemoved = true;
 					Buffs.RemoveAt(i);
 				}
 			}
@@ -484,11 +574,15 @@ void UElfBuffManager::TickBuffs(EInfoSide Side)
 	FElfCreatureInstance* Creature = GetActiveCreature(Side);
 	if (Creature)
 		TickOne(Creature->ActiveBuffs);
+
+	if (bCostBuffRemoved)
+		OnEnergyCostBuffChanged.Broadcast(Side);
 }
 
 int32 UElfBuffManager::ClearGeneralBuffs(EInfoSide Side, bool bClearBuffs, bool bClearDebuffs)
 {
 	int32 Cleared = 0;
+	bool bCostBuffCleared = false;
 
 	auto Filter = [&](TArray<FActiveBuff>& Buffs)
 	{
@@ -498,11 +592,15 @@ int32 UElfBuffManager::ClearGeneralBuffs(EInfoSide Side, bool bClearBuffs, bool 
 			if (Buff.bIsTraitBuff) continue; // 特性buff 不清除
 			if (bClearBuffs && Buff.bIsBuff)
 			{
+				if (Buff.EffectID == EEffectID::ModifyEnergyCost || Buff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+					bCostBuffCleared = true;
 				Buffs.RemoveAt(i);
 				Cleared++;
 			}
 			else if (bClearDebuffs && !Buff.bIsBuff)
 			{
+				if (Buff.EffectID == EEffectID::ModifyEnergyCost || Buff.EffectID == EEffectID::ModifyEnergyCostAndPower)
+					bCostBuffCleared = true;
 				Buffs.RemoveAt(i);
 				Cleared++;
 			}
@@ -517,6 +615,9 @@ int32 UElfBuffManager::ClearGeneralBuffs(EInfoSide Side, bool bClearBuffs, bool 
 	if (Creature)
 		Filter(Creature->ActiveBuffs);
 
+	if (bCostBuffCleared)
+		OnEnergyCostBuffChanged.Broadcast(Side);
+
 	return Cleared;
 }
 
@@ -524,6 +625,23 @@ FBattleSideData* UElfBuffManager::GetSide(EInfoSide Side)
 {
 	if (!BattleModel) return nullptr;
 	return (Side == EInfoSide::Self) ? &BattleModel->PlayerSide : &BattleModel->EnemySide;
+}
+
+bool UElfBuffManager::HasPoisonExtraTickOnField() const
+{
+	if (!BattleModel) return false;
+
+	auto HasTrait = [](FBattleSideData& Side) -> bool
+	{
+		if (Side.AbilityInstances.IsValidIndex(Side.ActiveIndex))
+		{
+			if (UElfAbilityBase* Ability = Side.AbilityInstances[Side.ActiveIndex])
+				return Ability->IsPoisonExtraTick();
+		}
+		return false;
+	};
+
+	return HasTrait(BattleModel->PlayerSide) || HasTrait(BattleModel->EnemySide);
 }
 
 FElfCreatureInstance* UElfBuffManager::GetActiveCreature(EInfoSide Side)

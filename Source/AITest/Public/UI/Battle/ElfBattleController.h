@@ -70,6 +70,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void SelectCreature(int32 Index);
 
+	// 高亮待切换槽位（等同局内 Switch 模式按数字键的效果：设 PendingSwitchSlot + 广播高亮；由空格/确认触发切换）
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void HighlightSwitchSlot(int32 SlotIndex);
+
+	// 确认切换（等同空格：对当前高亮槽位发起切换并清空高亮）
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void ConfirmSwitch();
+
 	UFUNCTION(BlueprintPure, Category = "战斗")
 	int32 CalculateSkillPower(int32 SlotIndex);
 
@@ -140,7 +148,16 @@ public:
 	FName GetBattleItemAtSlot(int32 FlatIndex);
 
 	const TArray<FName>& GetBattleItemList();
+	UFUNCTION(BlueprintCallable, Category = "战斗")
 	void UseCaptureItem(int32 FlatIndex);
+
+	// 高亮待使用捕捉球槽位（等同按数字键选择）
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void HighlightCaptureSlot(int32 SlotIndex);
+
+	// 确认捕捉（等同空格：使用当前高亮的捕捉球）
+	UFUNCTION(BlueprintCallable, Category = "战斗")
+	void ConfirmCapture();
 
 	UFUNCTION(BlueprintPure, Category = "战斗")
 	int32 GetCaptureItemCount();

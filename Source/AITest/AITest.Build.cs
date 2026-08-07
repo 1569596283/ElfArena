@@ -10,7 +10,7 @@ public class AITest : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags", "AnimGraphRuntime", "AIModule", "NavigationSystem" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags", "AnimGraphRuntime", "AIModule", "NavigationSystem", "Slate", "SlateCore" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
